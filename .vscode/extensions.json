@@ -1,0 +1,13 @@
+{
+	"recommendations": [
+		"gabrielgrinberg.auto-run-command",
+		"esbenp.prettier-vscode",
+		"dbaeumer.vscode-eslint",
+		"usernamehw.errorlens",
+		"salbert.comment-ts",
+		"kavod-io.vscode-jest-test-adapter",
+		"ryanluker.vscode-coverage-gutters",
+		"ethansk.restore-terminals",
+		"gruntfuggly.todo-tree"
+	]
+}

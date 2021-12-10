@@ -1,0 +1,33 @@
+{
+  "files.exclude": {
+    ".husky": true,
+    "coverage": true
+  },
+  "auto-run-command.rules": [
+    {
+      "condition": [
+        "hasFile: coverage/lcov.info"
+      ],
+      "command": "coverage-gutters.watchCoverageAndVisibleEditors",
+      "message": "Running coverage"
+    }
+  ],
+  "restoreTerminals.terminals": [
+    {
+      "splitTerminals": [
+        {
+          "name": "coverage",
+          "commands": [
+            "npm run cov:watch"
+          ]
+        },
+        {
+          "name": "zsh",
+          "commands": []
+        }
+      ]
+    },
+  ],
+  "todo-tree.tree.scanMode": "workspace only",
+  "npm-scripts.showStartNotification": false
+}

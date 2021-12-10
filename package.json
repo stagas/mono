@@ -1,0 +1,92 @@
+{
+  "name": "orgwasm",
+  "author": "stagas",
+  "short": "stagas/orgwasm",
+  "description": "orgwasm is a wasm expression compiler",
+  "version": "0.0.0",
+  "license": "MIT",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://git@github.com:stagas/orgwasm.git"
+  },
+  "keywords": [
+    "typescript",
+    "scaffold",
+    "skeleton",
+    "template"
+  ],
+  "module": "dist/esm/index.js",
+  "main": "dist/cjs/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
+    }
+  },
+  "targets": {
+    "main": {
+      "context": "node",
+      "engines": {
+        "node": ">=16.0"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "npm run clean && npm run build:cjs && npm run build:esm && echo done.",
+    "docs": "documentation readme src --resolve=node --pe ts --re ts --re d.ts --github --section=API --markdown-toc-max-depth=3",
+    "test": "jest",
+    "test:web": "web-test-runner",
+    "cov": "jest --coverage",
+    "bench": "fpick benchmark --repeat -- node -r esbuild-register",
+    "example": "fpick example --repeat -- node -r esbuild-register",
+    "playground": "vite --force --cors --https --clearScreen=false --open /playground/",
+    "lint": "eslint src && prettier --check src",
+    "build:watch": "onchange -i src --await-write-finish 400 -- npm run build",
+    "docs:watch": "onchange -i src --await-write-finish 400 -- npm run docs",
+    "test:watch": "jest --watchAll",
+    "cov:watch": "jest --coverage --watchAll",
+    "bench:watch": "fpick benchmark --repeat -- onchange -i src 'benchmark/**/*.{js,jsx,ts,tsx}' --await-write-finish 400 --kill -- node -r esbuild-register",
+    "example:watch": "fpick example --repeat -- onchange -i src example --await-write-finish 400 --kill -- node -r esbuild-register",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:esm": "tsc -p tsconfig.esm.json && echo '{\"type\":\"module\"}' >dist/esm/package.json",
+    "build:min": "esbuild src/index.ts --bundle --format=esm | terser --compress --module --mangle -o build.min.js",
+    "lint:fix": "eslint --fix src && prettier --write src",
+    "clean": "rimraf dist",
+    "prepack": "npm run build",
+    "prepack:dry": "npm pack --dry-run",
+    "prepare": "husky install"
+  },
+  "devDependencies": {
+    "@stagas/sucrase-jest-plugin": "^2.2.0-fork",
+    "@tsconfig/node16": "^1.0.2",
+    "@types/jest": "^27.0.3",
+    "@types/node": "^16.11.9",
+    "@typescript-eslint/eslint-plugin": "^5.4.0",
+    "@typescript-eslint/parser": "^5.4.0",
+    "@web/dev-server-esbuild": "^0.2.16",
+    "@web/test-runner": "^0.13.22",
+    "benny": "^3.7.1",
+    "benny-ascii-chart-reporter": "^1.0.1",
+    "documentation": "github:documentationjs/documentation",
+    "esbuild": "^0.13.15",
+    "esbuild-register": "^3.2.0",
+    "eslint": "^8.3.0",
+    "eslint-plugin-import": "^2.25.3",
+    "eslint-plugin-react": "^7.27.1",
+    "fpick": "^1.1.0",
+    "husky": "^7.0.4",
+    "jest": "^27.3.1",
+    "jest-browser-globals": "^25.1.0-beta",
+    "onchange": "^7.1.0",
+    "prettier": "^2.4.1",
+    "rimraf": "^3.0.2",
+    "terser": "^5.10.0",
+    "ts-node": "^10.4.0",
+    "typescript": "^4.5.2",
+    "vite": "^2.6.14"
+  }
+}
