@@ -1,8 +1,10 @@
-import { createParser, joinRegExp, Node } from 'tinypratt'
+import { createParser, joinRegExp, Node, Token } from 'tinypratt'
 
 export { Node }
 
-export const parse = createParser(
+export const parse: (input: string) => Node & {
+  panic: (message: string, token: Token) => string
+} = createParser(
   joinRegExp(
     [
       /(?<ids>[a-zA-Z_$][a-zA-Z0-9_$]*)/,

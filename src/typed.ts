@@ -26,26 +26,31 @@ export const Typed = (panic: (s: string, t: string) => string) => {
     },
   }
 
+  const typeOf = (x: string | SExpr): Type => (types.get(x) ?? Type.any) as Type
+
   const cast = (type: Type, x: SExpr) => {
     const childType = types.get(x)
     if (childType && childType != type) {
       const castOp = OpTypeCast[type][childType]
-      if (!castOp) return x
+      if (!castOp) {
+        types.set(x, type) // noop cast, but change the type for x
+        return x
+      }
       x = [castOp, x]
       types.set(x, type)
       return x
     } else {
-      types.set(x, type)
+      types.set(x, type) // x is any or unknown, so set the type for x
       return x
     }
   }
 
   const hi = (...children: SExpr): Type => {
-    const weights = children.map(x => Types.indexOf(types.get(x) as Type))
+    const weights = children.map(x => Types.indexOf(typeOf(x)))
     return Types[Math.max(...weights)]
   }
 
-  const min = (type: Type, ...types: Type[]): Type => {
+  const max = (type: Type, ...types: Type[]): Type => {
     return Types[Math.max(Types.indexOf(type), ...types.map(x => Types.indexOf(x)))]
   }
 
@@ -65,5 +70,5 @@ export const Typed = (panic: (s: string, t: string) => string) => {
     else throw new TypeError(panic('cannot infer type for', x))
   }
 
-  return { infer, top, min, hi, cast }
+  return { infer, top, max, hi, cast, typeOf }
 }

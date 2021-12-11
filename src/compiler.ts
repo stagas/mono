@@ -2,20 +2,23 @@ import { Node } from './parser'
 import { SExpr } from './sexpr'
 import { Typed, Type } from './typed'
 
+interface Op {
+  (...elements: SExpr[]): SExpr
+}
+
 interface OpTable {
-  [k: string]: (...elements: SExpr[]) => SExpr
+  [k: string]: Op | Op[]
 }
 
 export { Type }
 
 export const compile = (node: Node, type = Type.any) => {
   // const symbols = {}
-
   const panic = (node as any).panic
 
-  const { infer, top, min, hi, cast } = Typed(panic)
+  const { typeOf, infer, top, max, hi, cast } = Typed(panic)
 
-  const bin = (minType: Type, op: string) => (lhs: SExpr, rhs: SExpr) => top(min(minType, hi(lhs, rhs)), [op, lhs, rhs])
+  const bin = (maxType: Type, op: string) => (lhs: SExpr, rhs: SExpr) => top(max(maxType, hi(lhs, rhs)), [op, lhs, rhs])
 
   const todo = () => []
 
@@ -59,14 +62,27 @@ export const compile = (node: Node, type = Type.any) => {
     '>>': todo,
     '<<': todo,
 
-    '+': bin(Type.i32, 'add'),
-    '-': bin(Type.i32, 'sub'),
+    '+': [
+      // x+y : arithmetic add
+      bin(Type.i32, 'add'),
+      // +x  : cast to number
+      x => cast(max(Type.i32, typeOf(x)), x),
+    ],
+    '-': [
+      // x-y : arithmetic subtract
+      bin(Type.i32, 'sub'),
+      // -x  : arithmetic negate
+      x => bin(Type.i32, 'mul')(top(max(Type.i32, typeOf(x)), ['const', '-1']), x),
+    ],
 
+    // x*y : arithmetic multiply
     '*': bin(Type.i32, 'mul'),
+    // x/y : arithmetic divide
     '/': bin(Type.i32, 'div'),
     '%': todo,
 
-    '!': todo,
+    // !x  : logical not
+    '!': x => top(Type.bool, ['eqz', x]),
     '~': todo,
 
     '++': todo,
@@ -82,7 +98,11 @@ export const compile = (node: Node, type = Type.any) => {
   const build = (node: Node, type = Type.any): SExpr => {
     if (Array.isArray(node)) {
       const [sym, ...nodes] = node
-      return cast(type, Op[sym](...nodes.map(x => build(x))))
+      let op = Op[sym]
+      if (Array.isArray(op)) {
+        op = op.find(x => x.length === nodes.length) || op[0]
+      }
+      return cast(type, op(...nodes.map(x => build(x))))
     } else {
       return top(infer(node), ['const', node]) // literal
     }

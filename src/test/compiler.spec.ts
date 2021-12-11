@@ -36,4 +36,24 @@ describe('compile', () => {
   it('op w/ type cast bool -> f32', () => {
     expect(c('1+1', Type.f32)).toEqual('(f32.convert_i32_u (i32.add (i32.const 1) (i32.const 1)))')
   })
+
+  it('logical not', () => {
+    expect(c('!1')).toEqual('(i32.eqz (i32.const 1))')
+  })
+
+  it('logical not w/ f32', () => {
+    expect(c('!1.0')).toEqual('(i32.eqz (i32.trunc_f32_s (f32.const 1.0)))')
+  })
+
+  it('negate i32', () => {
+    expect(c('-1')).toEqual('(i32.mul (i32.const -1) (i32.const 1))')
+  })
+
+  it('negate f32', () => {
+    expect(c('-1.0')).toEqual('(f32.mul (f32.const -1) (f32.const 1.0))')
+  })
+
+  it('negate bool', () => {
+    expect(c('-!1')).toEqual('(i32.mul (i32.const -1) (i32.eqz (i32.const 1)))')
+  })
 })
