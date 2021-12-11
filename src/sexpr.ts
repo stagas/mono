@@ -1,17 +1,21 @@
-export interface SExpr extends Array<null | string | SExpr> {
-  [n: number]: null | string | SExpr
+export interface SExpr extends Array<string | SExpr> {
+  [n: number]: string | SExpr
 }
 
-export const S = (p: SExpr, x = 0): string => {
-  return `${' '.repeat(x)}(${p[0]} ${p
-    .slice(1)
-    .map(e => (Array.isArray(e) ? '\n' + S(e, x + 2) : e))
-    .join(' ')})`
+export const S = (p: string | SExpr, x = 0): string => {
+  return Array.isArray(p)
+    ? `${' '.repeat(x)}(${p[0]} ${p
+        .slice(1)
+        .map(e => (Array.isArray(e) ? '\n' : '') + S(e, x + 2))
+        .join(' ')})`
+    : p
 }
 
-export const S0 = (p: SExpr): string => {
-  return `(${p[0]} ${p
-    .slice(1)
-    .map(e => (Array.isArray(e) ? S(e) : e))
-    .join(' ')})`
+export const S0 = (p: string | SExpr): string => {
+  return Array.isArray(p)
+    ? `(${p[0]} ${p
+        .slice(1)
+        .map(e => S0(e))
+        .join(' ')})`
+    : p
 }

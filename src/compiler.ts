@@ -1,26 +1,92 @@
 import { Node } from './parser'
 import { SExpr } from './sexpr'
+import { Typed, Type } from './typed'
 
 interface OpTable {
-  [k: string]: (...elements: Node[]) => SExpr
+  [k: string]: (...elements: SExpr[]) => SExpr
 }
 
-export const compile = (node: Node) => {
+export { Type }
+
+export const compile = (node: Node, type = Type.any) => {
   // const symbols = {}
 
+  const panic = (node as any).panic
+
+  const { infer, top, min, hi, cast } = Typed(panic)
+
+  const bin = (minType: Type, op: string) => (lhs: SExpr, rhs: SExpr) => top(min(minType, hi(lhs, rhs)), [op, lhs, rhs])
+
+  const todo = () => []
+
   const Op: OpTable = {
-    '+': (lhs, rhs) => ['f32.add', build(lhs), build(rhs)],
+    ',': todo,
+    ';': todo,
+    '..': todo,
+
+    '=': todo,
+    '+=': todo,
+    '-=': todo,
+    '*=': todo,
+    '/=': todo,
+    '%=': todo,
+    '<<=': todo,
+    '>>=': todo,
+    '&=': todo,
+    '^=': todo,
+    '|=': todo,
+
+    '?': todo,
+
+    '||': todo,
+
+    '&&': todo,
+
+    '|': todo,
+
+    '^': todo,
+
+    '&': todo,
+
+    '==': todo,
+    '!=': todo,
+
+    '<': todo,
+    '>': todo,
+    '<=': todo,
+    '>=': todo,
+
+    '>>': todo,
+    '<<': todo,
+
+    '+': bin(Type.i32, 'add'),
+    '-': bin(Type.i32, 'sub'),
+
+    '*': bin(Type.i32, 'mul'),
+    '/': bin(Type.i32, 'div'),
+    '%': todo,
+
+    '!': todo,
+    '~': todo,
+
+    '++': todo,
+    '=+': todo,
+    '--': todo,
+    '=-': todo,
+    '[': todo,
+    '(': todo,
+    '@': todo,
+    '.': todo,
   }
 
-  const build = (node: Node): SExpr => {
+  const build = (node: Node, type = Type.any): SExpr => {
     if (Array.isArray(node)) {
-      const [op, ...rest] = node
-      return Op[op](...rest)
+      const [sym, ...nodes] = node
+      return cast(type, Op[sym](...nodes.map(x => build(x))))
     } else {
-      // literal
-      return ['f32.const', node]
+      return top(infer(node), ['const', node]) // literal
     }
   }
 
-  return build(node)
+  return build(node, type)
 }
