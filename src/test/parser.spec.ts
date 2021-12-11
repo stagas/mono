@@ -18,6 +18,7 @@ describe('parse', () => {
     expect('' + parse('+1')).toEqual('(+ 1)')
     expect('' + parse('a(z)')).toEqual('(@ a z)')
     expect('' + parse('a(z=1)')).toEqual('(@ a (= z 1))')
+    expect('' + parse('a()=x')).toEqual('(= (@ a ()) x)')
     expect('' + parse('a(z)=x')).toEqual('(= (@ a z) x)')
     expect('' + parse('a(z[0..2])=x')).toEqual('(= (@ a ([ z (.. 0 2))) x)')
     expect('' + parse('a(z[0..2]=2)=x')).toEqual('(= (@ a (= ([ z (.. 0 2)) 2)) x)')
@@ -56,14 +57,7 @@ describe('parse', () => {
     expect('' + parse('(((0)))')).toEqual('0')
     expect('' + parse('x[0][1]')).toEqual('([ ([ x 0) 1)')
     expect('' + parse('x[y[1]]')).toEqual('([ x ([ y 1))')
-    expect(
-      '' +
-        parse(`
-        a ? b
-      : c ? d
-          : e
-    `)
-    ).toEqual('(? a b (? c d e))')
+    expect('' + parse(`a ? b : c ? d : e`)).toEqual('(? a b (? c d e))')
     expect('' + parse('a = 0 ? b : c = d')).toEqual('(= a (? 0 b (= c d)))')
   })
 

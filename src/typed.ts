@@ -28,20 +28,16 @@ export const Typed = (panic: (s: string, t: string) => string) => {
 
   const typeOf = (x: string | SExpr): Type => (types.get(x) ?? Type.any) as Type
 
+  const typeAs = (type: Type, x: SExpr) => (types.set(x, type), x)
+
   const cast = (type: Type, x: SExpr) => {
-    const childType = types.get(x)
-    if (childType && childType != type) {
+    const childType = typeOf(x)
+    if (childType != type) {
       const castOp = OpTypeCast[type][childType]
-      if (!castOp) {
-        types.set(x, type) // noop cast, but change the type for x
-        return x
-      }
-      x = [castOp, x]
-      types.set(x, type)
-      return x
+      if (!castOp) return typeAs(type, x) // noop cast, but change the type for x
+      return typeAs(type, [castOp, x])
     } else {
-      types.set(x, type) // x is any or unknown, so set the type for x
-      return x
+      return typeAs(type, x) // x is any or unknown, so set the type for x
     }
   }
 
@@ -58,9 +54,7 @@ export const Typed = (panic: (s: string, t: string) => string) => {
     const prefix = type == Type.f32 ? 'f32' : 'i32'
     let [op, ...children] = ops // eslint-disable-line prefer-const
     children = children.map(x => cast(type, x as SExpr))
-    const result = [prefix + '.' + op, ...children]
-    types.set(result, type)
-    return result
+    return typeAs(type, [prefix + '.' + op, ...children])
   }
 
   const infer = (x: string): Type => {
@@ -70,5 +64,5 @@ export const Typed = (panic: (s: string, t: string) => string) => {
     else throw new TypeError(panic('cannot infer type for', x))
   }
 
-  return { infer, top, max, hi, cast, typeOf }
+  return { typeOf, typeAs, cast, hi, max, top, infer }
 }
