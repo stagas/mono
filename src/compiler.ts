@@ -45,16 +45,20 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const panic = (node as any).panic // TODO: resolve this in tinypratt
 
+  // create types
   const { typeOf, typeAs, cast, hi, max, top, infer } = Typed(panic)
 
+  /** todo is a "not implemented" marker for ops */
+  const todo = null
+
+  /** creates a simple binary op */
   const bin =
     (maxType: Type, op: string) =>
     (lhs: SExpr, rhs: SExpr): SExpr =>
       top(max(maxType, hi(lhs, rhs)), [op, lhs, rhs])
 
-  const todo = null
-
-  const parseFunc = (ctx: Context, ops: OpTable, sym: string, args: Node[], rhs: Node) => {
+  /** defines a function */
+  const funcdef = (ctx: Context, ops: OpTable, sym: string, args: Node[], rhs: Node) => {
     const body = map(flatten(';', rhs), ctx, ops)
     const func: Func = [map(args, ctx, OpArgs), typeAs(typeOf(body.at(-1)), body)]
     funcs[sym] = func
@@ -62,6 +66,7 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
     return func
   }
 
+  /** primary optable */
   const Op: OpTable = {
     ',': todo,
     ';': todo,
@@ -76,7 +81,7 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
           const [sym, args] = [lhs[1], flatten(',', lhs[2]).filter(Boolean)] as [Token, Node[]]
           const scope = Object.fromEntries(args.map(x => [x, Type.f32]))
           const ctx = { scope, args: [] }
-          parseFunc(ctx, ops, sym, args, rhs)
+          funcdef(ctx, ops, sym, args, rhs)
           return []
         }
         // x=y : variable assignment
@@ -207,6 +212,7 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
     }),
   }
 
+  /** arguments optable */
   const OpArgs: OpTable = {
     ...Op,
     '..': [(lhs, rhs) => [lhs, rhs]],
@@ -220,6 +226,7 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
     ids: <NodeOp>((id: Token, local: Context) => (mush(local.args, { id }), [id])),
   }
 
+  /** builds a `node` under context `ctx` and optable `ops` */
   const build = (node: Node, ctx: Context, ops: OpTable): SExpr => {
     if (Array.isArray(node)) {
       const [sym, ...nodes] = node as [Token, Node[]]
@@ -235,14 +242,20 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
     }
   }
 
+  /** builds an array of `nodes` under context `ctx` and optable `ops` */
   const map = (nodes: Node[], ctx: Context, ops: OpTable): SExpr[] =>
     nodes
       .filter(Boolean)
       .map(x => build(x, ctx, ops))
       .filter(x => x.length > 0)
 
-  parseFunc(global, Op, '__start__', [], node)
+  // ==================================================================================
+  // init
 
+  // create start function
+  funcdef(global, Op, '__start__', [], node)
+
+  // create module
   const mod = {
     body: [['start', '$__start__']] as SExpr,
     funcs,
@@ -252,6 +265,7 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
     },
   }
 
+  // create functions
   for (const [sym, func] of Object.entries(funcs)) {
     const [args, body] = func
     const ctx = contexts.get(func)!
