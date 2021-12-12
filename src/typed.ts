@@ -45,6 +45,9 @@ export const Typed = (panic: (s: string, t: string) => string) => {
     }
   }
 
+  /** casts all `values` to be of type `type` */
+  const castAll = (type: Type, ...values: SExpr): SExpr => values.map(x => cast(type, x as SExpr))
+
   /** returns the highest precision type of the given values */
   const hi = (...values: SExpr): Type => {
     const weights = values.map(x => Types.indexOf(typeOf(x)))
@@ -56,12 +59,11 @@ export const Typed = (panic: (s: string, t: string) => string) => {
     return Types[Math.max(Types.indexOf(type), ...types.map(x => Types.indexOf(x)))]
   }
 
-  /** types a wasm operation with the correct prefix (f32 or i32) */
+  /** types an operation with the correct prefix (f32 or i32) and type casts the values to satisfy the op */
   const top = (type: Type, ops: SExpr): SExpr => {
     const prefix = type == Type.f32 ? 'f32' : 'i32'
-    let [op, ...children] = ops // eslint-disable-line prefer-const
-    children = children.map(x => cast(type, x as SExpr))
-    return typeAs(type, [prefix + '.' + op, ...children])
+    const [op, ...values] = ops
+    return typeAs(type, [prefix + '.' + op, ...castAll(type, ...values)])
   }
 
   /** infers the type of a token literal string: bool for 0 or 1, i32 for integers and f32 for floats */
@@ -72,5 +74,5 @@ export const Typed = (panic: (s: string, t: string) => string) => {
     else throw new TypeError(panic('cannot infer type for', x))
   }
 
-  return { typeOf, typeAs, cast, hi, max, top, infer }
+  return { typeOf, typeAs, cast, castAll, hi, max, top, infer }
 }

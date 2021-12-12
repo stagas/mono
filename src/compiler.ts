@@ -46,7 +46,7 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
   const panic = (node as any).panic // TODO: resolve this in tinypratt
 
   // create types
-  const { typeOf, typeAs, cast, hi, max, top, infer } = Typed(panic)
+  const { typeOf, typeAs, cast, castAll, hi, max, top, infer } = Typed(panic)
 
   /** todo is a "not implemented" marker for ops */
   const todo = null
@@ -155,7 +155,14 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
     '*': bin(Type.i32, 'mul'),
     // x/y : arithmetic divide
     '/': bin(Type.i32, 'div'),
-    '%': todo,
+    '%': [
+      (lhs, rhs) => {
+        const hiType = hi(lhs, rhs)
+        if (hiType == Type.f32) return ['call', '$mod', ...castAll(Type.f32, lhs, rhs)]
+        if (hiType == Type.bool) return top(Type.i32, ['rem_s', lhs, rhs])
+        return top(Type.i32, ['rem_u', lhs, rhs])
+      },
+    ],
 
     // !x : logical not
     '!': [x => top(Type.bool, ['eqz', x])],

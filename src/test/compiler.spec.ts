@@ -256,4 +256,11 @@ describe('compile', () => {
       '(if (result f32) (i32.trunc_f32_s (f32.const 1.5)) (then (f32.const 1.2)) (else (f32.convert_i32_u (i32.const 2))))'
     )
   })
+
+  it('modulo', () => {
+    expect(c('1%2')).toEqual('(i32.rem_u (i32.const 1) (i32.const 2))')
+    expect(c('0%1')).toEqual('(i32.rem_s (i32.const 0) (i32.const 1))')
+    expect(c('1.2%1')).toEqual('(call $mod (f32.const 1.2) (f32.convert_i32_s (i32.const 1)))')
+    expect(c('1.2%2')).toEqual('(call $mod (f32.const 1.2) (f32.convert_i32_u (i32.const 2)))')
+  })
 })
