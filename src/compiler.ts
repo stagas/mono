@@ -153,25 +153,30 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
     '(': todo,
     '@': <RawOp>(() =>
       (local, ops) =>
-      (sym: Token, args): SExpr => {
+      (sym: Token, rhs): SExpr => {
         const func = funcs[sym]
         if (!func) throw new ReferenceError(panic('function not found', sym))
-        // TODO: validate op args against func.args
-        // pass defaults when missing args
         const ctx = contexts.get(func)!
-        const mappedArgs = map(flatten(',', args), local, ops)
+        // evaluate argument expressions
+        const args = map(flatten(',', rhs), local, ops)
+        // examine function argument declarations against passed arguments
         ctx.args.forEach((arg, i) => {
+          // function argument declaration has default value
           if (arg.default) {
-            if (!mappedArgs[i]) mappedArgs[i] = arg.default
-            else mappedArgs[i] = cast(typeOf(arg.default), mappedArgs[i])
-          } else if (mappedArgs[i]) {
-            mappedArgs[i] = cast(Type.f32, mappedArgs[i])
-          } else {
-            mappedArgs[i] = ['f32.const', '0']
+            // missing passed argument becomes the default value
+            if (!args[i]) args[i] = arg.default
+            // has passed argument but cast it to correct type
+            else args[i] = cast(typeOf(arg.default), args[i])
           }
+          // has passed argument but no default, it is cast implicitly to f32
+          else if (args[i]) args[i] = cast(Type.f32, args[i])
+          // did not pass argument and no default, so implicitly push a zero f32 (0.0)
+          else args[i] = ['f32.const', '0']
         })
-        mappedArgs.length = ctx.args.length // truncate args to the function's
-        return ['call', '$' + sym, ...mappedArgs]
+        // truncate number of passed arguments down to the accepted function arguments
+        args.length = ctx.args.length
+        // call the function
+        return ['call', '$' + sym, ...args]
       }),
     '.': todo,
 
