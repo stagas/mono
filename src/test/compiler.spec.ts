@@ -72,8 +72,102 @@ describe('compile', () => {
     const ctx = mod.contexts.get(mod.funcs['a'])!
     expect(ctx.args).toMatchObject([
       {
-        id: { 0: 'b' },
-        default: ['i32.const', { 0: '1' }],
+        id: { value: 'b' },
+        default: ['i32.const', { value: '1' }],
+      },
+    ])
+  })
+
+  it('function declaration with arg range', () => {
+    expect(func('a', 'a(b[1..2])=1')).toEqual([[['b']], [['i32.const', '1']]])
+    const mod = compile(parse('a(b[1..2])=1'))
+    const ctx = mod.contexts.get(mod.funcs['a'])!
+    expect(ctx.args).toMatchObject([
+      {
+        id: { value: 'b' },
+        range: [
+          ['i32.const', { value: '1' }],
+          ['i32.const', { value: '2' }],
+        ],
+      },
+    ])
+  })
+
+  it('function declaration with arg range expression', () => {
+    expect(func('a', 'a(b[1+2..2+3])=1')).toEqual([[['b']], [['i32.const', '1']]])
+    const mod = compile(parse('a(b[1+2..2+3])=1'))
+    const ctx = mod.contexts.get(mod.funcs['a'])!
+    expect(ctx.args).toMatchObject([
+      {
+        id: { value: 'b' },
+        range: [
+          ['i32.add', ['i32.const', { value: '1' }], ['i32.const', { value: '2' }]],
+          ['i32.add', ['i32.const', { value: '2' }], ['i32.const', { value: '3' }]],
+        ],
+      },
+    ])
+  })
+
+  it('function declaration with arg range expression and default', () => {
+    expect(func('a', 'a(b[1+2..2+3]=4)=1')).toEqual([[['b']], [['i32.const', '1']]])
+    const mod = compile(parse('a(b[1+2..2+3]=4)=1'))
+    const ctx = mod.contexts.get(mod.funcs['a'])!
+    expect(ctx.args).toMatchObject([
+      {
+        id: { value: 'b' },
+        default: ['i32.const', { value: '4' }],
+        range: [
+          ['i32.add', ['i32.const', { value: '1' }], ['i32.const', { value: '2' }]],
+          ['i32.add', ['i32.const', { value: '2' }], ['i32.const', { value: '3' }]],
+        ],
+      },
+    ])
+  })
+
+  it('function declaration with arg range expression and default expression', () => {
+    expect(func('a', 'a(b[1+2..2+3]=1.5+2.5)=1')).toEqual([[['b']], [['i32.const', '1']]])
+    const mod = compile(parse('a(b[1+2..2+3]=1.5+2.5)=1'))
+    const ctx = mod.contexts.get(mod.funcs['a'])!
+    expect(ctx.args).toMatchObject([
+      {
+        id: { value: 'b' },
+        default: ['f32.add', ['f32.const', { value: '1.5' }], ['f32.const', { value: '2.5' }]],
+        range: [
+          ['i32.add', ['i32.const', { value: '1' }], ['i32.const', { value: '2' }]],
+          ['i32.add', ['i32.const', { value: '2' }], ['i32.const', { value: '3' }]],
+        ],
+      },
+    ])
+  })
+
+  it('function declaration with arg range and default', () => {
+    expect(func('a', 'a(b[1..2]=1.5)=1')).toEqual([[['b']], [['i32.const', '1']]])
+    const mod = compile(parse('a(b[1..2]=1.5)=1'))
+    const ctx = mod.contexts.get(mod.funcs['a'])!
+    expect(ctx.args).toMatchObject([
+      {
+        id: { value: 'b' },
+        default: ['f32.const', { value: '1.5' }],
+        range: [
+          ['i32.const', { value: '1' }],
+          ['i32.const', { value: '2' }],
+        ],
+      },
+    ])
+  })
+
+  it('function declaration with arg range and default expression', () => {
+    expect(func('a', 'a(b[1..2]=1.5+2.5)=1')).toEqual([[['b']], [['i32.const', '1']]])
+    const mod = compile(parse('a(b[1..2]=1.5+2.5)=1'))
+    const ctx = mod.contexts.get(mod.funcs['a'])!
+    expect(ctx.args).toMatchObject([
+      {
+        id: { value: 'b' },
+        default: ['f32.add', ['f32.const', { value: '1.5' }], ['f32.const', { value: '2.5' }]],
+        range: [
+          ['i32.const', { value: '1' }],
+          ['i32.const', { value: '2' }],
+        ],
       },
     ])
   })
@@ -84,8 +178,8 @@ describe('compile', () => {
     const ctx = mod.contexts.get(mod.funcs['a'])!
     expect(ctx.args).toMatchObject([
       {
-        id: { 0: 'b' },
-        default: ['i32.add', ['i32.const', { 0: '1' }], ['i32.const', { 0: '2' }]],
+        id: { value: 'b' },
+        default: ['i32.add', ['i32.const', { value: '1' }], ['i32.const', { value: '2' }]],
       },
     ])
   })

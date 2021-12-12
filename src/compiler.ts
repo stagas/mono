@@ -193,9 +193,25 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
     ...Op,
 
     '=': <RawOp>(() => (local, ops) => (id: Token, value) => {
-      local.args.push({
+      if (Array.isArray(id)) id = build(id, local, ops)[0] as Token
+      const arg = local.args.find(x => x.id == id)
+
+      const def = {
         id,
         default: build(value, local, ops),
+      }
+      if (arg) Object.assign(arg, def)
+      else local.args.push(def)
+
+      return [id]
+    }),
+
+    '..': [(lhs, rhs) => [lhs, rhs]],
+
+    '[': <RawOp>(() => (local, ops) => (id: Token, range) => {
+      local.args.push({
+        id,
+        range: build(range, local, ops),
       })
       return [id]
     }),
@@ -247,7 +263,7 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
       'func',
       '$' + sym,
       ['export', `"${sym}"`],
-      ...args.map(x => ['param', '$' + x, 'f32']), // TODO: handle range, defaults
+      ...args.map(x => ['param', '$' + x, 'f32']), // TODO: handle range
       ...(body.length ? [['result', max(Type.i32, typeOf(body))]] : []),
       ...Object.entries(ctx.scope).map(([x, type]) => ['local', '$' + x, max(Type.i32, type)]),
       ...body,
