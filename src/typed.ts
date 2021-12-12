@@ -1,4 +1,5 @@
 import { SExpr } from './sexpr'
+import { Token } from './parser'
 
 export enum Type {
   any = 'any',
@@ -57,7 +58,7 @@ export const Typed = (panic: (s: string, t: string) => string) => {
     return typeAs(type, [prefix + '.' + op, ...children])
   }
 
-  const infer = (x: string): Type => {
+  const infer = (x: Token): Type => {
     if (x == '0' || x == '1') return Type.bool
     else if (!x.includes('.')) return Type.i32
     else if (x.includes('.')) return Type.f32

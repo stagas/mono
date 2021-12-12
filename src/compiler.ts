@@ -3,26 +3,43 @@ import { SExpr } from './sexpr'
 import { Node, Token } from './parser'
 import { flatten } from './util'
 
+interface NodeOp {
+  (node: Node, ctx: Context, ops: OpTable): SExpr
+}
+
 interface Op {
   (...sexprs: SExpr[]): SExpr
 }
 
 interface RawOp {
-  (): (scope: Scope) => (...nodes: Node[]) => SExpr
+  (): (local: Context, ops: OpTable) => (...nodes: Node[]) => SExpr
 }
 
 interface OpTable {
-  [k: string]: null | RawOp | Op | Op[]
+  [k: string]: null | RawOp | NodeOp | Op | Op[]
 }
 
 type Scope = Record<string, Type>
+
+interface Arg {
+  id: Token
+  default?: SExpr
+  range?: SExpr
+}
+
+type Args = Record<string, Arg>
+
+interface Context {
+  scope: Scope
+  args: Args
+}
 
 type Func = [SExpr, SExpr]
 
 export { Type }
 
-export const compile = (node: Node, global: Scope = {}) => {
-  const scopes = new Map<Func, Scope>()
+export const compile = (node: Node, global: Context = { scope: {}, args: {} }) => {
+  const contexts = new Map<Func, Context>()
   const funcs: Record<string, Func> = {}
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -37,11 +54,11 @@ export const compile = (node: Node, global: Scope = {}) => {
 
   const todo = null
 
-  const parseFunc = (scope: Scope, sym: string, args: Node[], rhs: Node) => {
-    const body = map(flatten(';', rhs), scope)
-    const func: Func = [args, typeAs(typeOf(body.at(-1)), body)]
+  const parseFunc = (ctx: Context, ops: OpTable, sym: string, args: Node[], rhs: Node) => {
+    const body = map(flatten(';', rhs), ctx, ops)
+    const func: Func = [map(args, ctx, OpArgs), typeAs(typeOf(body.at(-1)), body)]
     funcs[sym] = func
-    scopes.set(func, scope)
+    contexts.set(func, ctx)
     return func
   }
 
@@ -51,23 +68,24 @@ export const compile = (node: Node, global: Scope = {}) => {
     '..': todo,
 
     '=': <RawOp>(() =>
-      local =>
+      (local, ops) =>
       (lhs, rhs): SExpr => {
         // f()=x : function declaration
         if (Array.isArray(lhs)) {
           if (lhs[0] != '@') throw new SyntaxError(panic('invalid assignment', lhs[0]))
           const [sym, args] = [lhs[1], flatten(',', lhs[2])] as [Token, Node[]]
           const scope = Object.fromEntries(args.map(x => [x, Type.f32]))
-          parseFunc(scope, sym, args, rhs)
+          const ctx = { scope, args: {} }
+          parseFunc(ctx, ops, sym, args, rhs)
           return []
         }
         // x=y : variable assignment
         else {
           const symbol = lhs
-          const value = build(rhs, local)
-          const scope = symbol in local ? local : symbol in global ? global : local
+          const value = build(rhs, local, ops)
+          const scope = symbol in local.scope ? local.scope : symbol in global.scope ? global.scope : local.scope
           const type = symbol in scope ? scope[symbol] : (scope[symbol] = typeOf(value))
-          return typeAs(type, [(scope === global ? 'global' : 'local') + '.set', '$' + symbol, cast(type, value)])
+          return typeAs(type, [(scope === global.scope ? 'global' : 'local') + '.set', '$' + symbol, cast(type, value)])
         }
       }),
     '+=': todo,
@@ -124,7 +142,7 @@ export const compile = (node: Node, global: Scope = {}) => {
     '%': todo,
 
     // !x : logical not
-    '!': x => top(Type.bool, ['eqz', x]),
+    '!': [x => top(Type.bool, ['eqz', x])],
     '~': todo,
 
     '++': todo,
@@ -134,40 +152,65 @@ export const compile = (node: Node, global: Scope = {}) => {
     '[': todo,
     '(': todo,
     '@': <RawOp>(() =>
-      local =>
+      (local, ops) =>
       (sym: Token, args): SExpr => {
         const func = funcs[sym]
         if (!func) throw new ReferenceError(panic('function not found', sym))
-        return ['call', '$' + sym, ...map(flatten(',', args), local).map(x => cast(Type.f32, x))]
+        // TODO: validate op args against func.args
+        // pass defaults when missing args
+        return ['call', '$' + sym, ...map(flatten(',', args), local, ops).map(x => cast(Type.f32, x))]
       }),
     '.': todo,
+
+    num: <NodeOp>((node: Token) => top(infer(node), ['const', node])),
   }
 
-  const build = (node: Node, scope: Scope, type = Type.any): SExpr => {
+  const OpArgs: OpTable = {
+    ...Op,
+
+    '=': <RawOp>(() => (local, ops) => (id: Token, value) => {
+      local.args[id] = {
+        id,
+        default: build(value, local, ops),
+      }
+      return [id]
+    }),
+
+    ids: <NodeOp>((id: Token, local: Context) => {
+      local.args[id] = {
+        id,
+      }
+      return [id]
+    }),
+  }
+
+  const build = (node: Node, ctx: Context, ops: OpTable): SExpr => {
     if (Array.isArray(node)) {
       const [sym, ...nodes] = node as [Token, Node[]]
       if (!sym || !nodes.length) return []
-      let op = Op[sym]
+      let op = ops[sym]
       if (!op) throw new Error(panic('not implemented', sym))
       if (Array.isArray(op)) op = op.find(x => x.length === nodes.length) || op[0]
-      return cast(type, <SExpr>(op.length ? op(...map(nodes, scope)) : (op as RawOp)()(scope)(...nodes)))
+      return <SExpr>(op.length ? (<Op>op)(...map(nodes, ctx, ops)) : (<RawOp>op)()(ctx, ops)(...nodes))
     } else {
-      return top(infer(node), ['const', node]) // literal
+      const op = ops[node.group]
+      if (!op) throw new Error(panic ? panic('not implemented', node) : 'not implemented: ' + node)
+      return (<NodeOp>op)(node, ctx, ops)
     }
   }
 
-  const map = (nodes: Node[], scope: Scope, type = Type.any): SExpr[] =>
+  const map = (nodes: Node[], ctx: Context, ops: OpTable): SExpr[] =>
     nodes
       .filter(Boolean)
-      .map(x => build(x, scope, type))
+      .map(x => build(x, ctx, ops))
       .filter(x => x.length > 0)
 
-  parseFunc(global, '__start__', [], node)
+  parseFunc(global, Op, '__start__', [], node)
 
   const mod = {
     body: [['start', '$__start__']] as SExpr,
     funcs,
-    scopes,
+    contexts,
     valueOf() {
       return this.body
     },
@@ -179,7 +222,7 @@ export const compile = (node: Node, global: Scope = {}) => {
       'func',
       '$' + sym,
       ['export', `"${sym}"`],
-      ...args.map(x => ['param', '$' + x, 'f32']),
+      ...args.map(x => ['param', '$' + x, 'f32']), // TODO: handle range, defaults
       ['result', max(Type.i32, typeOf(body))],
       ...body,
     ])

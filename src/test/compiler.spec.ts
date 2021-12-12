@@ -2,13 +2,16 @@ import { compile } from '../compiler'
 import { parse, Node } from '../parser'
 import { S0, SExpr } from '../sexpr'
 
-const fc = (sym: string, s: string, global = {}) => S0(compile(parse(s), global).funcs[sym].pop()!)
-const c = (s: string, global = {}) => fc('__start__', s, global)
+// helpers
+const deepToString = (x: string | SExpr): string | SExpr => (Array.isArray(x) ? x.map(deepToString) : '' + x)
+const func = (sym: string, s: string) => deepToString([...compile(parse(s)).funcs[sym]!])
+const fc = (sym: string, s: string, global?: any) => S0(compile(parse(s), global).funcs[sym].pop()!)
+const c = (s: string, global?: any) => fc('__start__', s, global)
 
 describe('compile', () => {
-  it('literal', () => {
-    expect(compile('1' as Node).funcs['__start__'].pop()).toEqual([['i32.const', '1']])
-  })
+  // it('literal', () => {
+  //   expect(compile('1' as Node).funcs['__start__'].pop()).toEqual([['i32.const', '1']])
+  // })
 
   it('parser node', () => {
     expect(c('1')).toEqual('(i32.const 1)')
@@ -59,8 +62,12 @@ describe('compile', () => {
   })
 
   it('function declaration', () => {
-    expect(func('a', 'a(b)=1')).toEqual([['b'], [['i32.const', '1']]])
-    expect(func('a', 'a(b,c)=1')).toEqual([['b', 'c'], [['i32.const', '1']]])
+    expect(func('a', 'a(b)=1')).toEqual([[['b']], [['i32.const', '1']]])
+    expect(func('a', 'a(b,c)=1')).toEqual([[['b'], ['c']], [['i32.const', '1']]])
+  })
+
+  it('function declaration with arg defaults', () => {
+    expect(func('a', 'a(b=1)=1')).toEqual([[['b']], [['i32.const', '1']]])
   })
 
   it('assignment global', () => {
@@ -91,6 +98,3 @@ describe('compile', () => {
     expect(c('a()=1;a(1.0)')).toEqual('(call $a (f32.const 1.0))')
   })
 })
-
-const deepToString = (x: string | SExpr): string | SExpr => (Array.isArray(x) ? x.map(deepToString) : '' + x)
-const func = (sym: string, s: string) => deepToString([...compile(parse(s)).funcs[sym]!])
