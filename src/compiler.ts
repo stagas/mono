@@ -51,11 +51,17 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
   /** todo is a "not implemented" marker for ops */
   const todo = null
 
-  /** creates a simple binary op */
+  /** creates a simple binary op of least type `maxType` */
   const bin =
     (maxType: Type, op: string) =>
     (lhs: SExpr, rhs: SExpr): SExpr =>
       top(max(maxType, hi(lhs, rhs)), [op, lhs, rhs])
+
+  /** creates a simple binary op of exact type `type` */
+  const typebin =
+    (type: Type, op: string) =>
+    (lhs: SExpr, rhs: SExpr): SExpr =>
+      top(type, [op, lhs, rhs])
 
   /** defines a function */
   const funcdef = (ctx: Context, ops: OpTable, sym: string, args: Node[], rhs: Node) => {
@@ -104,6 +110,7 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
     '^=': todo,
     '|=': todo,
 
+    // x?y:z : ternary conditional
     '?': [
       (cond, if_body, else_body) => {
         const type = hi(if_body, else_body)
@@ -121,11 +128,14 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
 
     '&&': todo,
 
-    '|': todo,
+    // x|y : bitwise OR
+    '|': typebin(Type.i32, 'or'),
 
-    '^': todo,
+    // x^y : bitwise XOR
+    '^': typebin(Type.i32, 'xor'),
 
-    '&': todo,
+    // x&y : bitwise AND
+    '&': typebin(Type.i32, 'and'),
 
     '==': todo,
     '!=': todo,
@@ -135,8 +145,10 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
     '<=': todo,
     '>=': todo,
 
-    '>>': todo,
-    '<<': todo,
+    // x>>y : bitwise shift right
+    '>>': typebin(Type.i32, 'shr_s'),
+    // x<<y : bitwise shift left
+    '<<': typebin(Type.i32, 'shl'),
 
     '+': [
       // x+y : arithmetic add
@@ -166,7 +178,8 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
 
     // !x : logical not
     '!': [x => top(Type.bool, ['eqz', x])],
-    '~': todo,
+    // ~x : bitwise NOT
+    '~': [x => top(Type.i32, ['not', x])],
 
     '++': todo,
     '=+': todo,

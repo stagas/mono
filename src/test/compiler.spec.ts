@@ -17,7 +17,7 @@ describe('compile', () => {
     expect(c('1')).toEqual('(i32.const 1)')
   })
 
-  it('op', () => {
+  it('x+y add op', () => {
     expect(c('1+2')).toEqual('(i32.add (i32.const 1) (i32.const 2))')
   })
 
@@ -25,15 +25,15 @@ describe('compile', () => {
   //   expect(c('1+2', {}, Type.f32)).toEqual('(f32.convert_i32_u (i32.add (i32.const 1) (i32.const 2)))')
   // })
 
-  it('op w/ type cast i32 -> i32', () => {
+  it('x+y add w/ type cast i32 -> i32', () => {
     expect(c('1+2')).toEqual('(i32.add (i32.const 1) (i32.const 2))')
   })
 
-  it('op w/ type cast i32 -> bool', () => {
+  it('x+y add w/ type cast i32 -> bool', () => {
     expect(c('1+2')).toEqual('(i32.add (i32.const 1) (i32.const 2))')
   })
 
-  it('op w/ type cast bool -> i32', () => {
+  it('x+y add w/ type cast bool -> i32', () => {
     expect(c('1+1')).toEqual('(i32.add (i32.const 1) (i32.const 1))')
   })
 
@@ -41,23 +41,23 @@ describe('compile', () => {
   //   expect(c('1+1', {}, Type.f32)).toEqual('(f32.convert_i32_u (i32.add (i32.const 1) (i32.const 1)))')
   // })
 
-  it('logical not', () => {
+  it('!x logical not', () => {
     expect(c('!1')).toEqual('(i32.eqz (i32.const 1))')
   })
 
-  it('logical not w/ f32', () => {
+  it('!x logical not w/ f32', () => {
     expect(c('!1.0')).toEqual('(i32.eqz (i32.trunc_f32_s (f32.const 1.0)))')
   })
 
-  it('negate i32', () => {
+  it('-x negate i32', () => {
     expect(c('-1')).toEqual('(i32.mul (i32.const -1) (i32.const 1))')
   })
 
-  it('negate f32', () => {
+  it('-x negate f32', () => {
     expect(c('-1.0')).toEqual('(f32.mul (f32.const -1) (f32.const 1.0))')
   })
 
-  it('negate bool', () => {
+  it('-x negate bool', () => {
     expect(c('-!1')).toEqual('(i32.mul (i32.const -1) (i32.eqz (i32.const 1)))')
   })
 
@@ -246,7 +246,7 @@ describe('compile', () => {
     expect(fc('f', 'a=2.0;f(a)=a')).toEqual('(local.get $a)')
   })
 
-  it('ternary', () => {
+  it('x?y:z ternary', () => {
     expect(c('0?1:2')).toEqual('(if (result i32) (i32.const 0) (then (i32.const 1)) (else (i32.const 2)))')
     expect(c('1?1:2')).toEqual('(if (result i32) (i32.const 1) (then (i32.const 1)) (else (i32.const 2)))')
     expect(c('1?1.2:2')).toEqual(
@@ -257,10 +257,40 @@ describe('compile', () => {
     )
   })
 
-  it('modulo', () => {
+  it('x%y modulo', () => {
     expect(c('1%2')).toEqual('(i32.rem_u (i32.const 1) (i32.const 2))')
     expect(c('0%1')).toEqual('(i32.rem_s (i32.const 0) (i32.const 1))')
     expect(c('1.2%1')).toEqual('(call $mod (f32.const 1.2) (f32.convert_i32_s (i32.const 1)))')
     expect(c('1.2%2')).toEqual('(call $mod (f32.const 1.2) (f32.convert_i32_u (i32.const 2)))')
+  })
+
+  it('x<<y bitwise shift left', () => {
+    expect(c('1<<2')).toEqual('(i32.shl (i32.const 1) (i32.const 2))')
+    expect(c('1.2<<2')).toEqual('(i32.shl (i32.trunc_f32_u (f32.const 1.2)) (i32.const 2))')
+  })
+
+  it('x>>y bitwise shift right', () => {
+    expect(c('1>>2')).toEqual('(i32.shr_s (i32.const 1) (i32.const 2))')
+    expect(c('1.2>>2')).toEqual('(i32.shr_s (i32.trunc_f32_u (f32.const 1.2)) (i32.const 2))')
+  })
+
+  it('x&y bitwise AND', () => {
+    expect(c('1&2')).toEqual('(i32.and (i32.const 1) (i32.const 2))')
+    expect(c('1.2&2')).toEqual('(i32.and (i32.trunc_f32_u (f32.const 1.2)) (i32.const 2))')
+  })
+
+  it('x^y bitwise XOR', () => {
+    expect(c('1^2')).toEqual('(i32.xor (i32.const 1) (i32.const 2))')
+    expect(c('1.2^2')).toEqual('(i32.xor (i32.trunc_f32_u (f32.const 1.2)) (i32.const 2))')
+  })
+
+  it('x|y bitwise OR', () => {
+    expect(c('1|2')).toEqual('(i32.or (i32.const 1) (i32.const 2))')
+    expect(c('1.2|2')).toEqual('(i32.or (i32.trunc_f32_u (f32.const 1.2)) (i32.const 2))')
+  })
+
+  it('~y bitwise NOT', () => {
+    expect(c('~1')).toEqual('(i32.not (i32.const 1))')
+    expect(c('~1.2')).toEqual('(i32.not (i32.trunc_f32_u (f32.const 1.2)))')
   })
 })
