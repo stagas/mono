@@ -66,8 +66,28 @@ describe('compile', () => {
     expect(func('a', 'a(b,c)=1')).toEqual([[['b'], ['c']], [['i32.const', '1']]])
   })
 
-  it('function declaration with arg defaults', () => {
+  it('function declaration with arg default literal', () => {
     expect(func('a', 'a(b=1)=1')).toEqual([[['b']], [['i32.const', '1']]])
+    const mod = compile(parse('a(b=1)=1'))
+    const ctx = mod.contexts.get(mod.funcs['a'])!
+    expect(ctx.args).toMatchObject([
+      {
+        id: { 0: 'b' },
+        default: ['i32.const', { 0: '1' }],
+      },
+    ])
+  })
+
+  it('function declaration with arg default expression', () => {
+    expect(func('a', 'a(b=1)=1')).toEqual([[['b']], [['i32.const', '1']]])
+    const mod = compile(parse('a(b=1+2)=1'))
+    const ctx = mod.contexts.get(mod.funcs['a'])!
+    expect(ctx.args).toMatchObject([
+      {
+        id: { 0: 'b' },
+        default: ['i32.add', ['i32.const', { 0: '1' }], ['i32.const', { 0: '2' }]],
+      },
+    ])
   })
 
   it('assignment global', () => {
@@ -93,8 +113,14 @@ describe('compile', () => {
   })
 
   it('function call', () => {
-    expect(c('a()=1;a(1,2)')).toEqual('(call $a (f32.convert_i32_s (i32.const 1)) (f32.convert_i32_u (i32.const 2)))')
+    expect(c('a()=1;a(1,2)')).toEqual('(call $a)')
+    expect(c('a(x,y)=1;a(1,2)')).toEqual('(call $a (f32.convert_i32_s (i32.const 1)) (f32.convert_i32_u (i32.const 2)))')
     expect(c('a()=1;a()')).toEqual('(call $a)')
-    expect(c('a()=1;a(1.0)')).toEqual('(call $a (f32.const 1.0))')
+    expect(c('a(x)=1;a(1.0)')).toEqual('(call $a (f32.const 1.0))')
+  })
+
+  it('function call arg default', () => {
+    expect(c('a(b=1)=1;a()')).toEqual('(call $a (i32.const 1))')
+    expect(c('a(b=1.5)=1;a()')).toEqual('(call $a (f32.const 1.5))')
   })
 })

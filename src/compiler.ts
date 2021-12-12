@@ -27,7 +27,7 @@ interface Arg {
   range?: SExpr
 }
 
-type Args = Record<string, Arg>
+type Args = Arg[] //Record<string, Arg>
 
 interface Context {
   scope: Scope
@@ -38,7 +38,7 @@ type Func = [SExpr, SExpr]
 
 export { Type }
 
-export const compile = (node: Node, global: Context = { scope: {}, args: {} }) => {
+export const compile = (node: Node, global: Context = { scope: {}, args: [] }) => {
   const contexts = new Map<Func, Context>()
   const funcs: Record<string, Func> = {}
 
@@ -75,7 +75,7 @@ export const compile = (node: Node, global: Context = { scope: {}, args: {} }) =
           if (lhs[0] != '@') throw new SyntaxError(panic('invalid assignment', lhs[0]))
           const [sym, args] = [lhs[1], flatten(',', lhs[2])] as [Token, Node[]]
           const scope = Object.fromEntries(args.map(x => [x, Type.f32]))
-          const ctx = { scope, args: {} }
+          const ctx = { scope, args: [] }
           parseFunc(ctx, ops, sym, args, rhs)
           return []
         }
@@ -158,7 +158,20 @@ export const compile = (node: Node, global: Context = { scope: {}, args: {} }) =
         if (!func) throw new ReferenceError(panic('function not found', sym))
         // TODO: validate op args against func.args
         // pass defaults when missing args
-        return ['call', '$' + sym, ...map(flatten(',', args), local, ops).map(x => cast(Type.f32, x))]
+        const ctx = contexts.get(func)!
+        const mappedArgs = map(flatten(',', args), local, ops)
+        ctx.args.forEach((arg, i) => {
+          if (arg.default) {
+            if (!mappedArgs[i]) mappedArgs[i] = arg.default
+            else mappedArgs[i] = cast(typeOf(arg.default), mappedArgs[i])
+          } else if (mappedArgs[i]) {
+            mappedArgs[i] = cast(Type.f32, mappedArgs[i])
+          } else {
+            mappedArgs[i] = ['f32.const', '0']
+          }
+        })
+        mappedArgs.length = ctx.args.length // truncate args to the function's
+        return ['call', '$' + sym, ...mappedArgs]
       }),
     '.': todo,
 
@@ -169,17 +182,17 @@ export const compile = (node: Node, global: Context = { scope: {}, args: {} }) =
     ...Op,
 
     '=': <RawOp>(() => (local, ops) => (id: Token, value) => {
-      local.args[id] = {
+      local.args.push({
         id,
         default: build(value, local, ops),
-      }
+      })
       return [id]
     }),
 
     ids: <NodeOp>((id: Token, local: Context) => {
-      local.args[id] = {
+      local.args.push({
         id,
-      }
+      })
       return [id]
     }),
   }
