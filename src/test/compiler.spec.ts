@@ -245,4 +245,15 @@ describe('compile', () => {
   it('parameter shadow global variable', () => {
     expect(fc('f', 'a=2.0;f(a)=a')).toEqual('(local.get $a)')
   })
+
+  it('ternary', () => {
+    expect(c('0?1:2')).toEqual('(if (result i32) (i32.const 0) (then (i32.const 1)) (else (i32.const 2)))')
+    expect(c('1?1:2')).toEqual('(if (result i32) (i32.const 1) (then (i32.const 1)) (else (i32.const 2)))')
+    expect(c('1?1.2:2')).toEqual(
+      '(if (result f32) (i32.const 1) (then (f32.const 1.2)) (else (f32.convert_i32_u (i32.const 2))))'
+    )
+    expect(c('1.5?1.2:2')).toEqual(
+      '(if (result f32) (i32.trunc_f32_s (f32.const 1.5)) (then (f32.const 1.2)) (else (f32.convert_i32_u (i32.const 2))))'
+    )
+  })
 })

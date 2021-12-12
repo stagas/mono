@@ -99,7 +99,18 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
     '^=': todo,
     '|=': todo,
 
-    '?': todo,
+    '?': [
+      (cond, if_body, else_body) => {
+        const type = hi(if_body, else_body)
+        return [
+          'if', //
+          ['result', type],
+          cast(Type.bool, cond),
+          ['then', cast(type, if_body)],
+          ['else', cast(type, else_body)],
+        ]
+      },
+    ],
 
     '||': todo,
 
