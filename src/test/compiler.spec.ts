@@ -1,5 +1,5 @@
 import { compile } from '../compiler'
-import { parse, Node } from '../parser'
+import { parse } from '../parser'
 import { S0, SExpr } from '../sexpr'
 
 // helpers
@@ -122,5 +122,25 @@ describe('compile', () => {
   it('function call arg default', () => {
     expect(c('a(b=1)=1;a()')).toEqual('(call $a (i32.const 1))')
     expect(c('a(b=1.5)=1;a()')).toEqual('(call $a (f32.const 1.5))')
+  })
+
+  it('variable get global', () => {
+    expect(c('a=1;a')).toEqual('(global.set $a (i32.const 1)) (global.get $a)')
+  })
+
+  it('variable get local', () => {
+    expect(fc('f', 'f()=(a=1;a)')).toEqual('(local.set $a (i32.const 1)) (local.get $a)')
+    const mod = compile(parse('f()=(a=1;a)'))
+    expect(S0(mod.body)).toEqual(
+      '(start $__start__) (func $f (export "f") (result i32) (local $a i32) (local.set $a (i32.const 1)) (local.get $a)) (func $__start__ (export "__start__"))'
+    )
+  })
+
+  it('variable get global from within local context', () => {
+    expect(fc('f', 'a=2.0;f()=a')).toEqual('(global.get $a)')
+  })
+
+  it('parameter shadow global variable', () => {
+    expect(fc('f', 'a=2.0;f(a)=a')).toEqual('(local.get $a)')
   })
 })

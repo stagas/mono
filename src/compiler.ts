@@ -4,7 +4,7 @@ import { Node, Token } from './parser'
 import { flatten } from './util'
 
 interface NodeOp {
-  (node: Node, ctx: Context, ops: OpTable): SExpr
+  (node: Node, local: Context, ops: OpTable): SExpr
 }
 
 interface Op {
@@ -73,7 +73,7 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
         // f()=x : function declaration
         if (Array.isArray(lhs)) {
           if (lhs[0] != '@') throw new SyntaxError(panic('invalid assignment', lhs[0]))
-          const [sym, args] = [lhs[1], flatten(',', lhs[2])] as [Token, Node[]]
+          const [sym, args] = [lhs[1], flatten(',', lhs[2]).filter(Boolean)] as [Token, Node[]]
           const scope = Object.fromEntries(args.map(x => [x, Type.f32]))
           const ctx = { scope, args: [] }
           parseFunc(ctx, ops, sym, args, rhs)
@@ -180,7 +180,13 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
       }),
     '.': todo,
 
-    num: <NodeOp>((node: Token) => top(infer(node), ['const', node])),
+    num: <NodeOp>((lit: Token): SExpr => top(infer(lit), ['const', lit])),
+
+    ids: <NodeOp>((symbol: Token, local): SExpr => {
+      const scope = symbol in local.scope ? local.scope : symbol in global.scope ? global.scope : local.scope
+      if (!(symbol in scope)) throw new ReferenceError(panic('symbol not defined', symbol))
+      return [(scope === global.scope ? 'global' : 'local') + '.get', '$' + symbol]
+    }),
   }
 
   const OpArgs: OpTable = {
@@ -236,12 +242,14 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
 
   for (const [sym, func] of Object.entries(funcs)) {
     const [args, body] = func
+    const ctx = contexts.get(func)!
     mod.body.push([
       'func',
       '$' + sym,
       ['export', `"${sym}"`],
       ...args.map(x => ['param', '$' + x, 'f32']), // TODO: handle range, defaults
-      ['result', max(Type.i32, typeOf(body))],
+      ...(body.length ? [['result', max(Type.i32, typeOf(body))]] : []),
+      ...Object.entries(ctx.scope).map(([x, type]) => ['local', '$' + x, max(Type.i32, type)]),
       ...body,
     ])
   }
