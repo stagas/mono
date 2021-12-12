@@ -1,6 +1,6 @@
 import { createParser, joinRegExp, Node, Token } from 'tinypratt'
 
-export { Node }
+export { Node, Token }
 
 export const parse: (input: string) => Node & {
   panic: (message: string, token: Token) => string
@@ -73,7 +73,7 @@ export const parse: (input: string) => Node & {
     '++': [[15, 1], { led: (t, _, x) => [t.as('=+'), x], nud: post(14) }],
     '--': [[15, 1], { led: (t, _, x) => [t.as('=-'), x], nud: post(14) }],
     '[': [[15, 15], { led: until(']', 0, (t, L, R) => [t, L, R]) }],
-    '(': [[15, 0], { led: until(')', 0, (t, L, R) => [t.as('@'), L, R]), nud: until(')', 0, (_, __, x) => x) }],
+    '(': [[15, 0], { led: until(')', 0, (t, L, R) => [t.as('@'), L, R].filter(Boolean)), nud: until(')', 0, (_, __, x) => x) }],
     '.': [[15, 16], { led: bin }],
   })
 )

@@ -26,7 +26,7 @@ export const Typed = (panic: (s: string, t: string) => string) => {
     },
   }
 
-  const typeOf = (x: string | SExpr): Type => (types.get(x) ?? Type.any) as Type
+  const typeOf = (x: undefined | string | SExpr): Type => ((x && types.get(x)) ?? Type.any) as Type
 
   const typeAs = (type: Type, x: SExpr) => (types.set(x, type), x)
 

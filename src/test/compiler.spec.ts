@@ -1,20 +1,13 @@
-import { compile, Type } from '../compiler'
+import { compile } from '../compiler'
 import { parse, Node } from '../parser'
 import { S0, SExpr } from '../sexpr'
 
-const c = (s: string, global = {}, type = Type.any) => {
-  const [, body, last] = compile(parse(s), global, type).funcs['__start__']
-  return S0([...body, last])
-}
-
-const fc = (sym: string, s: string, global = {}, type = Type.any) => {
-  const [, body, last] = compile(parse(s), global, type).funcs[sym]
-  return S0([...body, last])
-}
+const fc = (sym: string, s: string, global = {}) => S0(compile(parse(s), global).funcs[sym].pop()!)
+const c = (s: string, global = {}) => fc('__start__', s, global)
 
 describe('compile', () => {
   it('literal', () => {
-    expect(compile('1' as Node).funcs['__start__'].pop()).toEqual(['i32.const', '1'])
+    expect(compile('1' as Node).funcs['__start__'].pop()).toEqual([['i32.const', '1']])
   })
 
   it('parser node', () => {
@@ -30,15 +23,15 @@ describe('compile', () => {
   // })
 
   it('op w/ type cast i32 -> i32', () => {
-    expect(c('1+2', {}, Type.i32)).toEqual('(i32.add (i32.const 1) (i32.const 2))')
+    expect(c('1+2')).toEqual('(i32.add (i32.const 1) (i32.const 2))')
   })
 
   it('op w/ type cast i32 -> bool', () => {
-    expect(c('1+2', {}, Type.bool)).toEqual('(i32.add (i32.const 1) (i32.const 2))')
+    expect(c('1+2')).toEqual('(i32.add (i32.const 1) (i32.const 2))')
   })
 
   it('op w/ type cast bool -> i32', () => {
-    expect(c('1+1', {}, Type.i32)).toEqual('(i32.add (i32.const 1) (i32.const 1))')
+    expect(c('1+1')).toEqual('(i32.add (i32.const 1) (i32.const 1))')
   })
 
   // it('op w/ type cast bool -> f32', () => {
@@ -66,8 +59,8 @@ describe('compile', () => {
   })
 
   it('function declaration', () => {
-    expect(func('a', 'a(b)=1')).toEqual([['b'], [], ['i32.const', '1']])
-    expect(func('a', 'a(b,c)=1')).toEqual([['b', 'c'], [], ['i32.const', '1']])
+    expect(func('a', 'a(b)=1')).toEqual([['b'], [['i32.const', '1']]])
+    expect(func('a', 'a(b,c)=1')).toEqual([['b', 'c'], [['i32.const', '1']]])
   })
 
   it('assignment global', () => {
@@ -90,6 +83,12 @@ describe('compile', () => {
   it('parameters shadow globals', () => {
     expect(fc('f', 'a=1;f()=a=2')).toEqual('(global.set $a (i32.const 2))')
     expect(fc('f', 'a=1;f(a)=a=2')).toEqual('(local.set $a (f32.convert_i32_u (i32.const 2)))')
+  })
+
+  it('function call', () => {
+    expect(c('a()=1;a(1,2)')).toEqual('(call $a (f32.convert_i32_s (i32.const 1)) (f32.convert_i32_u (i32.const 2)))')
+    expect(c('a()=1;a()')).toEqual('(call $a)')
+    expect(c('a()=1;a(1.0)')).toEqual('(call $a (f32.const 1.0))')
   })
 })
 

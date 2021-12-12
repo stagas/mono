@@ -1,7 +1,5 @@
-import { Node } from './parser'
-
-export interface SExpr extends Array<string | SExpr | Node> {
-  [n: number]: string | SExpr | Node
+export interface SExpr extends Array<string | SExpr> {
+  [n: number]: string | SExpr
 }
 
 export const S = (p: string | SExpr, x = 0): string => {
