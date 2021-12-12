@@ -213,9 +213,17 @@ describe('compile', () => {
     expect(c('a(x)=1;a(1.0)')).toEqual('(call $a (f32.const 1.0))')
   })
 
-  it('function call arg default', () => {
+  it('function call arg missing use default', () => {
     expect(c('a(b=1)=1;a()')).toEqual('(call $a (i32.const 1))')
     expect(c('a(b=1.5)=1;a()')).toEqual('(call $a (f32.const 1.5))')
+  })
+
+  it('function call arg missing no default, use argument range', () => {
+    expect(c('a(b[1..2])=1;a()')).toEqual('(call $a (i32.const 1))')
+  })
+
+  it('function call arg passed, use argument range for type cast', () => {
+    expect(c('a(b[1.5..2.5])=1;a(1)')).toEqual('(call $a (f32.convert_i32_s (i32.const 1)))')
   })
 
   it('variable get global', () => {

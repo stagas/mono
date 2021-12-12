@@ -1,7 +1,7 @@
 import { Typed, Type } from './typed'
-import { SExpr } from './sexpr'
 import { Node, Token } from './parser'
-import { flatten } from './util'
+import { SExpr } from './sexpr'
+import { flatten, mush } from './util'
 
 interface NodeOp {
   (node: Node, local: Context, ops: OpTable): SExpr
@@ -19,7 +19,9 @@ interface OpTable {
   [k: string]: null | RawOp | NodeOp | Op | Op[]
 }
 
-type Scope = Record<string, Type>
+interface Scope {
+  [k: string]: Type
+}
 
 interface Arg {
   id: Token
@@ -27,11 +29,9 @@ interface Arg {
   range?: SExpr
 }
 
-type Args = Arg[] //Record<string, Arg>
-
 interface Context {
   scope: Scope
-  args: Args
+  args: Arg[]
 }
 
 type Func = [SExpr, SExpr]
@@ -168,6 +168,13 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
             // has passed argument but cast it to correct type
             else args[i] = cast(typeOf(arg.default), args[i])
           }
+          // function argument declaration has range
+          else if (arg.range) {
+            // missing passed argument becomes the start of range value
+            if (!args[i]) args[i] = arg.range[0] as SExpr
+            // has passed argument but cast it to correct type
+            else args[i] = cast(hi(...arg.range), args[i])
+          }
           // has passed argument but no default, it is cast implicitly to f32
           else if (args[i]) args[i] = cast(Type.f32, args[i])
           // did not pass argument and no default, so implicitly push a zero f32 (0.0)
@@ -191,37 +198,15 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
 
   const OpArgs: OpTable = {
     ...Op,
-
-    '=': <RawOp>(() => (local, ops) => (id: Token, value) => {
-      if (Array.isArray(id)) id = build(id, local, ops)[0] as Token
-      const arg = local.args.find(x => x.id == id)
-
-      const def = {
-        id,
-        default: build(value, local, ops),
-      }
-      if (arg) Object.assign(arg, def)
-      else local.args.push(def)
-
-      return [id]
-    }),
-
     '..': [(lhs, rhs) => [lhs, rhs]],
-
-    '[': <RawOp>(() => (local, ops) => (id: Token, range) => {
-      local.args.push({
-        id,
-        range: build(range, local, ops),
-      })
+    '=': <RawOp>(() => (local, ops) => (id: Token, value) => {
+      // if it's not an atom then it has ranges
+      if (Array.isArray(id)) id = build(id, local, ops)[0] as Token
+      mush(local.args, { id, default: build(value, local, ops) })
       return [id]
     }),
-
-    ids: <NodeOp>((id: Token, local: Context) => {
-      local.args.push({
-        id,
-      })
-      return [id]
-    }),
+    '[': <RawOp>(() => (local, ops) => (id: Token, range) => (mush(local.args, { id, range: build(range, local, ops) }), [id])),
+    ids: <NodeOp>((id: Token, local: Context) => (mush(local.args, { id }), [id])),
   }
 
   const build = (node: Node, ctx: Context, ops: OpTable): SExpr => {
@@ -263,7 +248,7 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
       'func',
       '$' + sym,
       ['export', `"${sym}"`],
-      ...args.map(x => ['param', '$' + x, 'f32']), // TODO: handle range
+      ...args.map(x => ['param', '$' + x, 'f32']),
       ...(body.length ? [['result', max(Type.i32, typeOf(body))]] : []),
       ...Object.entries(ctx.scope).map(([x, type]) => ['local', '$' + x, max(Type.i32, type)]),
       ...body,
