@@ -169,8 +169,8 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
     // x&y : bitwise AND
     '&': typebin(Type.i32, 'and'),
 
-    '==': todo,
-    '!=': todo,
+    '==': bin(Type.i32, 'eq'),
+    '!=': bin(Type.i32, 'ne'),
 
     '<': todo,
     '>': todo,
