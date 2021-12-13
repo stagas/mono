@@ -41,11 +41,11 @@ describe('compile', () => {
   //   expect(c('1+1', {}, Type.f32)).toEqual('(f32.convert_i32_u (i32.add (i32.const 1) (i32.const 1)))')
   // })
 
-  it('!x logical not', () => {
+  it('!x logical Not', () => {
     expect(c('!1')).toEqual('(i32.eqz (i32.const 1))')
   })
 
-  it('!x logical not w/ f32', () => {
+  it('!x logical Not w/ f32', () => {
     expect(c('!1.0')).toEqual('(i32.eqz (i32.trunc_f32_s (f32.const 1.0)))')
   })
 
@@ -292,5 +292,15 @@ describe('compile', () => {
   it('~y bitwise NOT', () => {
     expect(c('~1')).toEqual('(i32.not (i32.const 1))')
     expect(c('~1.2')).toEqual('(i32.not (i32.trunc_f32_u (f32.const 1.2)))')
+  })
+
+  it('x&&y logical And', () => {
+    expect(c('1&&2')).toEqual('(if (result i32) (i32.ne (i32.const 0) (i32.const 1)) (then (i32.const 2)) (else (i32.const 0)))')
+    expect(c('1&&2&&3')).toEqual(
+      '(if (result i32) (i32.ne (i32.const 0) (i32.const 1)) (then (if (result i32) (i32.ne (i32.const 0) (i32.const 2)) (then (i32.const 3)) (else (i32.const 0)))) (else (i32.const 0)))'
+    )
+    expect(c('1&&2.5&&3')).toEqual(
+      '(if (result f32) (f32.ne (f32.const 0) (f32.convert_i32_s (i32.const 1))) (then (if (result f32) (f32.ne (f32.const 0) (f32.const 2.5)) (then (f32.convert_i32_u (i32.const 3))) (else (f32.const 0)))) (else (f32.const 0)))'
+    )
   })
 })

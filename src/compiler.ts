@@ -51,13 +51,13 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
   /** todo is a "not implemented" marker for ops */
   const todo = null
 
-  /** creates a simple binary op of least type `maxType` */
+  /** constructs a binary op of least type `type` */
   const bin =
-    (maxType: Type, op: string) =>
+    (type: Type, op: string) =>
     (lhs: SExpr, rhs: SExpr): SExpr =>
-      top(max(maxType, hi(lhs, rhs)), [op, lhs, rhs])
+      top(max(type, hi(lhs, rhs)), [op, lhs, rhs])
 
-  /** creates a simple binary op of exact type `type` */
+  /** constructs a binary op of exact type `type` */
   const typebin =
     (type: Type, op: string) =>
     (lhs: SExpr, rhs: SExpr): SExpr =>
@@ -114,19 +114,31 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
     '?': [
       (cond, if_body, else_body) => {
         const type = hi(if_body, else_body)
-        return [
+        return typeAs(type, [
           'if', //
           ['result', type],
           cast(Type.bool, cond),
           ['then', cast(type, if_body)],
           ['else', cast(type, else_body)],
-        ]
+        ])
       },
     ],
 
     '||': todo,
 
-    '&&': todo,
+    '&&': [
+      (lhs, rhs) => {
+        const type = hi(lhs, rhs)
+        const zero = top(type, ['const', '0'])
+        return typeAs(type, [
+          'if', //
+          ['result', type],
+          top(type, ['ne', zero, cast(type, lhs)]),
+          ['then', cast(type, rhs)],
+          ['else', zero],
+        ])
+      },
+    ],
 
     // x|y : bitwise OR
     '|': typebin(Type.i32, 'or'),
