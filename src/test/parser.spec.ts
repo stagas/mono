@@ -29,7 +29,7 @@ describe('parse', () => {
     expect('' + parse('a(1 + 2, b(3))')).toEqual('(@ a (, (+ 1 2) (@ b 3)))')
     expect('' + parse('a(1 + 2, b(3), c[1])')).toEqual('(@ a (, (, (+ 1 2) (@ b 3)) ([ c 1)))')
     expect('' + parse('a=1')).toEqual('(= a 1)')
-    expect('' + parse('a+=1')).toEqual('(+= a 1)')
+    expect('' + parse('a+=1')).toEqual('(= a (+ a 1))')
     expect('' + parse('a=1+2')).toEqual('(= a (+ 1 2))')
     expect('' + parse('a=1+2/3')).toEqual('(= a (+ 1 (/ 2 3)))')
     expect('' + parse('!1')).toEqual('(! 1)')

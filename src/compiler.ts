@@ -116,16 +116,6 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
         return typeAs(type, [(scope === global.scope ? 'global' : 'local') + '.set', '$' + symbol, cast(type, value)])
       }
     },
-    '+=': todo,
-    '-=': todo,
-    '*=': todo,
-    '/=': todo,
-    '%=': todo,
-    '<<=': todo,
-    '>>=': todo,
-    '&=': todo,
-    '^=': todo,
-    '|=': todo,
 
     // x?y:z : ternary conditional
     '?': (cond, then_body, else_body) => {
@@ -139,6 +129,7 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
       ])
     },
 
+    // logical Or
     '||':
       (): NodeOp =>
       (local, ops) =>
@@ -157,6 +148,7 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
         ])
       },
 
+    // logical And
     '&&': (lhs, rhs) => {
       const type = hi(lhs, rhs)
       const zero = top(type, ['const', '0'])
@@ -214,14 +206,18 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
       if (type === Type.bool) return top(Type.i32, ['rem_s', lhs, rhs])
       return top(Type.i32, ['rem_u', lhs, rhs])
     },
-    // !x : logical not
+    // !x : logical Not
     '!': x => top(Type.bool, ['eqz', x]),
     // ~x : bitwise NOT
     '~': x => top(Type.i32, ['not', x]),
 
+    // ++x
     '++': todo,
+    // x++
     '=+': todo,
+    // --x
     '--': todo,
+    // x--
     '=-': todo,
     '[': todo,
     '(': todo,
