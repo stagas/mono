@@ -3,20 +3,30 @@ import { Node, Token } from './parser'
 import { SExpr } from './sexpr'
 import { flatten, mush } from './util'
 
-interface NodeOp {
-  (node: Node, local: Context, ops: OpTable): SExpr
-}
-
 interface Op {
   (...sexprs: SExpr[]): SExpr
 }
 
-interface RawOp {
-  (): (local: Context, ops: OpTable) => (...nodes: Node[]) => SExpr
+type CtxOp = TokenOp | NodeOp
+
+interface TokenOp {
+  (local: Context, ops: OpTable): RawTokenOp
+}
+
+interface NodeOp {
+  (local: Context, ops: OpTable): RawNodeOp
+}
+
+interface RawTokenOp {
+  (lhs: Token, ...nodes: Node[]): SExpr
+}
+
+interface RawNodeOp {
+  (...nodes: Node[]): SExpr
 }
 
 interface OpTable {
-  [k: string]: null | RawOp | NodeOp | Op | Op[]
+  [k: string]: null | (() => CtxOp) | Op | Op[]
 }
 
 interface Scope {
@@ -53,18 +63,18 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
 
   /** constructs a binary op of least type `type` */
   const bin =
-    (type: Type, op: string) =>
-    (lhs: SExpr, rhs: SExpr): SExpr =>
+    (type: Type, op: string): Op =>
+    (lhs, rhs) =>
       top(max(type, hi(lhs, rhs)), [op, lhs, rhs])
 
   /** constructs a binary op of exact type `type` */
   const typebin =
-    (type: Type, op: string) =>
-    (lhs: SExpr, rhs: SExpr): SExpr =>
+    (type: Type, op: string): Op =>
+    (lhs, rhs) =>
       top(type, [op, lhs, rhs])
 
   /** defines a function */
-  const funcdef = (ctx: Context, ops: OpTable, sym: string, args: Node[], rhs: Node) => {
+  const funcDef = (ctx: Context, ops: OpTable, sym: string, args: Node[], rhs: Node) => {
     const body = map(flatten(';', rhs), ctx, ops)
     const func: Func = [map(args, ctx, OpArgs), typeAs(typeOf(body.at(-1)), body)]
     funcs[sym] = func
@@ -78,27 +88,25 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
     ';': todo,
     '..': todo,
 
-    '=': <RawOp>(() =>
-      (local, ops) =>
-      (lhs, rhs): SExpr => {
-        // f()=x : function declaration
-        if (Array.isArray(lhs)) {
-          if (lhs[0] != '@') throw new SyntaxError(panic('invalid assignment', lhs[0]))
-          const [sym, args] = [lhs[1], flatten(',', lhs[2]).filter(Boolean)] as [Token, Node[]]
-          const scope = Object.fromEntries(args.map(x => [x, Type.f32]))
-          const ctx = { scope, args: [] }
-          funcdef(ctx, ops, sym, args, rhs)
-          return []
-        }
-        // x=y : variable assignment
-        else {
-          const symbol = lhs
-          const value = build(rhs, local, ops)
-          const scope = symbol in local.scope ? local.scope : symbol in global.scope ? global.scope : local.scope
-          const type = symbol in scope ? scope[symbol] : (scope[symbol] = typeOf(value))
-          return typeAs(type, [(scope === global.scope ? 'global' : 'local') + '.set', '$' + symbol, cast(type, value)])
-        }
-      }),
+    '=': (): CtxOp => (local, ops) => (lhs, rhs) => {
+      // f()=x : function declaration
+      if (Array.isArray(lhs)) {
+        if (lhs[0] != '@') throw new SyntaxError(panic('invalid assignment', lhs[0]))
+        const [sym, args] = [lhs[1], flatten(',', lhs[2]).filter(Boolean)] as [Token, Node[]]
+        const scope = Object.fromEntries(args.map(x => [x, Type.f32]))
+        const ctx = { scope, args: [] }
+        funcDef(ctx, ops, sym, args, rhs)
+        return []
+      }
+      // x=y : variable assignment
+      else {
+        const symbol = lhs
+        const value = build(rhs, local, ops)
+        const scope = symbol in local.scope ? local.scope : symbol in global.scope ? global.scope : local.scope
+        const type = symbol in scope ? scope[symbol] : (scope[symbol] = typeOf(value))
+        return typeAs(type, [(scope === global.scope ? 'global' : 'local') + '.set', '$' + symbol, cast(type, value)])
+      }
+    },
     '+=': todo,
     '-=': todo,
     '*=': todo,
@@ -111,34 +119,46 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
     '|=': todo,
 
     // x?y:z : ternary conditional
-    '?': [
-      (cond, if_body, else_body) => {
-        const type = hi(if_body, else_body)
-        return typeAs(type, [
-          'if', //
-          ['result', type],
-          cast(Type.bool, cond),
-          ['then', cast(type, if_body)],
-          ['else', cast(type, else_body)],
-        ])
-      },
-    ],
+    '?': (cond, then_body, else_body) => {
+      const type = hi(then_body, else_body)
+      return typeAs(type, [
+        'if',
+        ['result', type],
+        cast(Type.bool, cond),
+        ['then', cast(type, then_body)],
+        ['else', cast(type, else_body)],
+      ])
+    },
 
-    '||': todo,
-
-    '&&': [
-      (lhs, rhs) => {
+    '||':
+      (): NodeOp =>
+      (local, ops) =>
+      (...nodes) => {
+        const [lhs, rhs] = map(nodes, local, ops)
         const type = hi(lhs, rhs)
+        const temp = '__lhs__' + type
         const zero = top(type, ['const', '0'])
+        if (!(temp in local.scope)) local.scope[temp] = type
         return typeAs(type, [
-          'if', //
+          'if',
           ['result', type],
-          top(type, ['ne', zero, cast(type, lhs)]),
-          ['then', cast(type, rhs)],
-          ['else', zero],
+          top(type, ['ne', zero, ['local.tee', temp, cast(type, lhs)]]),
+          ['then', ['local.get', temp]],
+          ['else', cast(type, rhs)],
         ])
       },
-    ],
+
+    '&&': (lhs, rhs) => {
+      const type = hi(lhs, rhs)
+      const zero = top(type, ['const', '0'])
+      return typeAs(type, [
+        'if',
+        ['result', type],
+        top(type, ['ne', zero, cast(type, lhs)]),
+        ['then', cast(type, rhs)],
+        ['else', zero],
+      ])
+    },
 
     // x|y : bitwise OR
     '|': typebin(Type.i32, 'or'),
@@ -179,19 +199,16 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
     '*': bin(Type.i32, 'mul'),
     // x/y : arithmetic divide
     '/': bin(Type.i32, 'div'),
-    '%': [
-      (lhs, rhs) => {
-        const hiType = hi(lhs, rhs)
-        if (hiType == Type.f32) return ['call', '$mod', ...castAll(Type.f32, lhs, rhs)]
-        if (hiType == Type.bool) return top(Type.i32, ['rem_s', lhs, rhs])
-        return top(Type.i32, ['rem_u', lhs, rhs])
-      },
-    ],
-
+    '%': (lhs, rhs) => {
+      const hiType = hi(lhs, rhs)
+      if (hiType == Type.f32) return ['call', '$mod', ...castAll(Type.f32, lhs, rhs)]
+      if (hiType == Type.bool) return top(Type.i32, ['rem_s', lhs, rhs])
+      return top(Type.i32, ['rem_u', lhs, rhs])
+    },
     // !x : logical not
-    '!': [x => top(Type.bool, ['eqz', x])],
+    '!': x => top(Type.bool, ['eqz', x]),
     // ~x : bitwise NOT
-    '~': [x => top(Type.i32, ['not', x])],
+    '~': x => top(Type.i32, ['not', x]),
 
     '++': todo,
     '=+': todo,
@@ -199,63 +216,61 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
     '=-': todo,
     '[': todo,
     '(': todo,
-    '@': <RawOp>(() =>
-      (local, ops) =>
-      (sym: Token, rhs): SExpr => {
-        const func = funcs[sym]
-        if (!func) throw new ReferenceError(panic('function not found', sym))
-        const ctx = contexts.get(func)!
-        // evaluate argument expressions
-        const args = map(flatten(',', rhs), local, ops)
-        // examine function argument declarations against passed arguments
-        ctx.args.forEach((arg, i) => {
-          // function argument declaration has default value
-          if (arg.default) {
-            // missing passed argument becomes the default value
-            if (!args[i]) args[i] = arg.default
-            // has passed argument but cast it to correct type
-            else args[i] = cast(typeOf(arg.default), args[i])
-          }
-          // function argument declaration has range
-          else if (arg.range) {
-            // missing passed argument becomes the start of range value
-            if (!args[i]) args[i] = arg.range[0] as SExpr
-            // has passed argument but cast it to correct type
-            else args[i] = cast(hi(...arg.range), args[i])
-          }
-          // has passed argument but no default, it is cast implicitly to f32
-          else if (args[i]) args[i] = cast(Type.f32, args[i])
-          // did not pass argument and no default, so implicitly push a zero f32 (0.0)
-          else args[i] = ['f32.const', '0']
-        })
-        // truncate number of passed arguments down to the accepted function arguments
-        args.length = ctx.args.length
-        // call the function
-        return ['call', '$' + sym, ...args]
-      }),
+    '@': (): CtxOp => (local, ops) => (sym, rhs) => {
+      const func = funcs[sym]
+      if (!func) throw new ReferenceError(panic('function not found', sym))
+      const ctx = contexts.get(func)!
+      // evaluate argument expressions
+      const args = map(flatten(',', rhs), local, ops)
+      // examine function argument declarations against passed arguments
+      ctx.args.forEach((arg, i) => {
+        // function argument declaration has default value
+        if (arg.default) {
+          // missing passed argument becomes the default value
+          if (!args[i]) args[i] = arg.default
+          // has passed argument but cast it to correct type
+          else args[i] = cast(typeOf(arg.default), args[i])
+        }
+        // function argument declaration has range
+        else if (arg.range) {
+          // missing passed argument becomes the start of range value
+          if (!args[i]) args[i] = arg.range[0] as SExpr
+          // has passed argument but cast it to correct type
+          else args[i] = cast(hi(...arg.range), args[i])
+        }
+        // has passed argument but no default, it is cast implicitly to f32
+        else if (args[i]) args[i] = cast(Type.f32, args[i])
+        // did not pass argument and no default, so implicitly push a zero f32 (0.0)
+        else args[i] = ['f32.const', '0']
+      })
+      // truncate number of passed arguments down to the accepted function arguments
+      args.length = ctx.args.length
+      // call the function
+      return ['call', '$' + sym, ...args]
+    },
     '.': todo,
 
-    num: <NodeOp>((lit: Token): SExpr => top(infer(lit), ['const', lit])),
+    num: (): CtxOp => () => lit => top(infer(lit), ['const', lit]),
 
-    ids: <NodeOp>((symbol: Token, local): SExpr => {
+    ids: (): CtxOp => local => symbol => {
       const scope = symbol in local.scope ? local.scope : symbol in global.scope ? global.scope : local.scope
       if (!(symbol in scope)) throw new ReferenceError(panic('symbol not defined', symbol))
       return [(scope === global.scope ? 'global' : 'local') + '.get', '$' + symbol]
-    }),
+    },
   }
 
   /** arguments optable */
   const OpArgs: OpTable = {
     ...Op,
-    '..': [(lhs, rhs) => [lhs, rhs]],
-    '=': <RawOp>(() => (local, ops) => (id: Token, value) => {
+    '..': (lhs, rhs) => [lhs, rhs],
+    '=': (): CtxOp => (local, ops) => (id, value) => {
       // if it's not an atom then it has ranges
       if (Array.isArray(id)) id = build(id, local, ops)[0] as Token
       mush(local.args, { id, default: build(value, local, ops) })
       return [id]
-    }),
-    '[': <RawOp>(() => (local, ops) => (id: Token, range) => (mush(local.args, { id, range: build(range, local, ops) }), [id])),
-    ids: <NodeOp>((id: Token, local: Context) => (mush(local.args, { id }), [id])),
+    },
+    '[': (): CtxOp => (local, ops) => (id, range) => (mush(local.args, { id, range: build(range, local, ops) }), [id]),
+    ids: (): CtxOp => local => id => (mush(local.args, { id }), [id]),
   }
 
   /** builds a `node` under context `ctx` and optable `ops` */
@@ -266,11 +281,11 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
       let op = ops[sym]
       if (!op) throw new Error(panic('not implemented', sym))
       if (Array.isArray(op)) op = op.find(x => x.length === nodes.length) || op[0]
-      return <SExpr>(op.length ? (<Op>op)(...map(nodes, ctx, ops)) : (<RawOp>op)()(ctx, ops)(...nodes))
+      return op.length ? (<Op>op)(...map(nodes, ctx, ops)) : (<() => NodeOp>op)()(ctx, ops)(...nodes)
     } else {
       const op = ops[node.group]
       if (!op) throw new Error(panic ? panic('not implemented', node) : 'not implemented: ' + node)
-      return (<NodeOp>op)(node, ctx, ops)
+      return (<() => CtxOp>op)()(ctx, ops)(node)
     }
   }
 
@@ -285,7 +300,7 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
   // init
 
   // create start function
-  funcdef(global, Op, '__start__', [], node)
+  funcDef(global, Op, '__start__', [], node)
 
   // create module
   const mod = {

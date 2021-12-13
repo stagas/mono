@@ -303,4 +303,16 @@ describe('compile', () => {
       '(if (result f32) (f32.ne (f32.const 0) (f32.convert_i32_s (i32.const 1))) (then (if (result f32) (f32.ne (f32.const 0) (f32.const 2.5)) (then (f32.convert_i32_u (i32.const 3))) (else (f32.const 0)))) (else (f32.const 0)))'
     )
   })
+
+  it('x&&y logical Or', () => {
+    expect(c('1||2')).toEqual(
+      '(if (result i32) (i32.ne (i32.const 0) (local.tee __lhs__i32 (i32.const 1))) (then (local.get __lhs__i32)) (else (i32.const 2)))'
+    )
+    expect(c('1||2||3')).toEqual(
+      '(if (result i32) (i32.ne (i32.const 0) (local.tee __lhs__i32 (i32.const 1))) (then (local.get __lhs__i32)) (else (if (result i32) (i32.ne (i32.const 0) (local.tee __lhs__i32 (i32.const 2))) (then (local.get __lhs__i32)) (else (i32.const 3)))))'
+    )
+    expect(c('1||2.5||3')).toEqual(
+      '(if (result f32) (f32.ne (f32.const 0) (local.tee __lhs__f32 (f32.convert_i32_s (i32.const 1)))) (then (local.get __lhs__f32)) (else (if (result f32) (f32.ne (f32.const 0) (local.tee __lhs__f32 (f32.const 2.5))) (then (local.get __lhs__f32)) (else (f32.convert_i32_u (i32.const 3))))))'
+    )
+  })
 })
