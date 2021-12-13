@@ -320,4 +320,9 @@ describe('compile', () => {
     expect(c('1==2')).toEqual('(i32.eq (i32.const 1) (i32.const 2))')
     expect(c('1.2==2.2')).toEqual('(f32.eq (f32.const 1.2) (f32.const 2.2))')
   })
+
+  it('x!=y non-equality', () => {
+    expect(c('1!=2')).toEqual('(i32.ne (i32.const 1) (i32.const 2))')
+    expect(c('1.2!=2.2')).toEqual('(f32.ne (f32.const 1.2) (f32.const 2.2))')
+  })
 })
