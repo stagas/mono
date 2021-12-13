@@ -73,6 +73,15 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
     (lhs, rhs) =>
       top(type, [op, lhs, rhs])
 
+  /** constructs an equality op */
+  const eq =
+    (op: string): Op =>
+    (lhs, rhs) => {
+      const type = max(Type.i32, hi(lhs, rhs))
+      if (type === Type.f32) return top(Type.f32, [op, lhs, rhs])
+      return top(Type.i32, [op + '_s', lhs, rhs])
+    }
+
   /** defines a function */
   const funcDef = (ctx: Context, ops: OpTable, sym: string, args: Node[], rhs: Node) => {
     const body = map(flatten(';', rhs), ctx, ops)
@@ -172,10 +181,10 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
     '==': bin(Type.i32, 'eq'),
     '!=': bin(Type.i32, 'ne'),
 
-    '<': todo,
-    '>': todo,
-    '<=': todo,
-    '>=': todo,
+    '<': eq('lt'),
+    '>': eq('gt'),
+    '<=': eq('le'),
+    '>=': eq('ge'),
 
     // x>>y : bitwise shift right
     '>>': typebin(Type.i32, 'shr_s'),
@@ -200,9 +209,9 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
     // x/y : arithmetic divide
     '/': bin(Type.i32, 'div'),
     '%': (lhs, rhs) => {
-      const hiType = hi(lhs, rhs)
-      if (hiType == Type.f32) return ['call', '$mod', ...castAll(Type.f32, lhs, rhs)]
-      if (hiType == Type.bool) return top(Type.i32, ['rem_s', lhs, rhs])
+      const type = hi(lhs, rhs)
+      if (type === Type.f32) return ['call', '$mod', ...castAll(Type.f32, lhs, rhs)]
+      if (type === Type.bool) return top(Type.i32, ['rem_s', lhs, rhs])
       return top(Type.i32, ['rem_u', lhs, rhs])
     },
     // !x : logical not

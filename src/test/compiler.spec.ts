@@ -325,4 +325,24 @@ describe('compile', () => {
     expect(c('1!=2')).toEqual('(i32.ne (i32.const 1) (i32.const 2))')
     expect(c('1.2!=2.2')).toEqual('(f32.ne (f32.const 1.2) (f32.const 2.2))')
   })
+
+  it('x<y less than', () => {
+    expect(c('1<2')).toEqual('(i32.lt_s (i32.const 1) (i32.const 2))')
+    expect(c('1.2<2.2')).toEqual('(f32.lt (f32.const 1.2) (f32.const 2.2))')
+  })
+
+  it('x>y greater than', () => {
+    expect(c('1>2')).toEqual('(i32.gt_s (i32.const 1) (i32.const 2))')
+    expect(c('1.2>2.2')).toEqual('(f32.gt (f32.const 1.2) (f32.const 2.2))')
+  })
+
+  it('x<=y less than or equal', () => {
+    expect(c('1<=2')).toEqual('(i32.le_s (i32.const 1) (i32.const 2))')
+    expect(c('1.2<=2.2')).toEqual('(f32.le (f32.const 1.2) (f32.const 2.2))')
+  })
+
+  it('x>=y greater than or equal', () => {
+    expect(c('1>=2')).toEqual('(i32.ge_s (i32.const 1) (i32.const 2))')
+    expect(c('1.2>=2.2')).toEqual('(f32.ge (f32.const 1.2) (f32.const 2.2))')
+  })
 })
