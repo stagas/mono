@@ -1,6 +1,6 @@
 import { Typed, Type } from './typed'
 import { Node, Token } from './parser'
-import { SExpr } from './sexpr'
+import { SExpr, S } from './sexpr'
 import { flatten, mush } from './util'
 
 interface Op {
@@ -46,17 +46,43 @@ interface Context {
 
 type Func = [SExpr, SExpr]
 
+export interface Imports {
+  [k: string]: { params: Type[]; result: Type }
+}
+
+export interface Module {
+  body: SExpr
+  funcs: Record<string, Func>
+  contexts: Map<Func, Context>
+  valueOf(): SExpr
+  toString(include?: string[]): string
+}
+
 export { Type }
 
-export const compile = (node: Node, global: Context = { scope: {}, args: [] }) => {
-  const contexts = new Map<Func, Context>()
-  const funcs: Record<string, Func> = {}
+export const compile = (node: Node, imports: Imports = {}) => {
+  const global = { scope: {}, args: [] }
+  const contexts: Module['contexts'] = new Map()
+  const funcs: Module['funcs'] = {}
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const panic = (node as any).panic // TODO: resolve this in tinypratt
 
   // create types
   const { typeOf, typeAs, cast, castAll, hi, max, top, infer } = Typed(panic)
+
+  for (const [name, { params, result }] of Object.entries(imports)) {
+    const func: Func = [[], typeAs(result as Type, [])]
+    funcs[name] = func
+    const ctx: Context = {
+      scope: {},
+      args: params.map((x: string, i) => ({
+        id: i.toString(),
+        default: typeAs(x as Type, [x + '.const', '0']),
+      })) as Arg[],
+    }
+    contexts.set(func, ctx)
+  }
 
   /** todo is a "not implemented" marker for ops */
   const todo = null
@@ -217,7 +243,9 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
     '(': todo,
     '@': (): CtxOp => (local, ops) => (sym, rhs) => {
       const func = funcs[sym]
-      if (!func) throw new ReferenceError(panic('function not found', sym))
+      if (!func) throw new ReferenceError(panic('function not defined', sym))
+      const body = func[1]
+      const type = typeOf(body)
       const ctx = contexts.get(func)!
       // evaluate argument expressions
       const args = map(flatten(',', rhs), local, ops)
@@ -245,7 +273,7 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
       // truncate number of passed arguments down to the accepted function arguments
       args.length = ctx.args.length
       // call the function
-      return ['call', '$' + sym, ...args]
+      return typeAs(type, ['call', '$' + sym, ...args])
     },
     '.': todo,
 
@@ -303,17 +331,21 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
   funcDef(global, Op, '__start__', [], node)
 
   // create module
-  const mod = {
+  const mod: Module = {
     body: [['start', '$__start__']] as SExpr,
     funcs,
     contexts,
     valueOf() {
       return this.body
     },
+    toString(include = []) {
+      return S(['module', ...include, ...this.body])
+    },
   }
 
   // create functions
   for (const [sym, func] of Object.entries(funcs)) {
+    if (sym in imports) continue
     const [args, body] = func
     const ctx = contexts.get(func)!
     mod.body.push([
@@ -321,9 +353,11 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
       '$' + sym,
       ['export', `"${sym}"`],
       ...args.map(x => ['param', '$' + x, ctx.scope[x as Token]]),
-      ...(body.length ? [['result', max(Type.i32, typeOf(body))]] : []),
-      ...Object.entries(ctx.scope).map(([x, type]) => ['local', '$' + x, max(Type.i32, type)]),
-      ...body,
+      ...(body.length && sym !== '__start__' ? [['result', max(Type.i32, typeOf(body))]] : []),
+      ...Object.entries(ctx.scope)
+        .filter(([x]) => !args.find(y => y == x))
+        .map(([x, type]) => ['local', '$' + x, max(Type.i32, type)]),
+      ...(sym === '__start__' ? (body.length ? [...body, 'drop'] : []) : body),
     ])
   }
 
