@@ -78,8 +78,8 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
     (op: string): Op =>
     (lhs, rhs) => {
       const type = max(Type.i32, hi(lhs, rhs))
-      if (type === Type.f32) return top(Type.f32, [op, lhs, rhs])
-      return top(Type.i32, [op + '_s', lhs, rhs])
+      if (type === Type.f32) return typeAs(Type.bool, top(Type.f32, [op, lhs, rhs]))
+      return typeAs(Type.bool, top(Type.i32, [op + '_s', lhs, rhs]))
     }
 
   /** defines a function */
@@ -122,7 +122,7 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
       const type = hi(then_body, else_body)
       return typeAs(type, [
         'if',
-        ['result', type],
+        ['result', max(Type.i32, type)],
         cast(Type.bool, cond),
         ['then', cast(type, then_body)],
         ['else', cast(type, else_body)],
@@ -141,7 +141,7 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
         if (!(temp in local.scope)) local.scope[temp] = type
         return typeAs(type, [
           'if',
-          ['result', type],
+          ['result', max(Type.i32, type)],
           top(type, ['ne', zero, ['local.tee', temp, cast(type, lhs)]]),
           ['then', ['local.get', temp]],
           ['else', cast(type, rhs)],
@@ -149,17 +149,19 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
       },
 
     // logical And
-    '&&': (lhs, rhs) => {
-      const type = hi(lhs, rhs)
-      const zero = top(type, ['const', '0'])
-      return typeAs(type, [
-        'if',
-        ['result', type],
-        top(type, ['ne', zero, cast(type, lhs)]),
-        ['then', cast(type, rhs)],
-        ['else', zero],
-      ])
-    },
+    // commented out because it's implemented as an AST rewrite
+    // in parser as a ternary: lhs!=0?rhs:0, also it was wrong.
+    // '&&': (lhs, rhs) => {
+    //   const type = hi(lhs, rhs)
+    //   const zero = top(type, ['const', '0'])
+    //   return typeAs(type, [
+    //     'if',
+    //     ['result', max(Type.i32, type)],
+    //     top(type, ['ne', zero, cast(type, lhs)]),
+    //     ['then', cast(type, rhs)],
+    //     ['else', zero],
+    //   ])
+    // },
 
     // x|y : bitwise OR
     '|': typebin(Type.i32, 'or'),
@@ -170,8 +172,8 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
     // x&y : bitwise AND
     '&': typebin(Type.i32, 'and'),
 
-    '==': bin(Type.i32, 'eq'),
-    '!=': bin(Type.i32, 'ne'),
+    '==': (lhs, rhs) => typeAs(Type.bool, bin(Type.i32, 'eq')(lhs, rhs)),
+    '!=': (lhs, rhs) => typeAs(Type.bool, bin(Type.i32, 'ne')(lhs, rhs)),
 
     '<': eq('lt'),
     '>': eq('gt'),
@@ -211,14 +213,6 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
     // ~x : bitwise NOT
     '~': x => top(Type.i32, ['not', x]),
 
-    // ++x
-    '++': todo,
-    // x++
-    '=+': todo,
-    // --x
-    '--': todo,
-    // x--
-    '=-': todo,
     '[': todo,
     '(': todo,
     '@': (): CtxOp => (local, ops) => (sym, rhs) => {
@@ -260,7 +254,8 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
     ids: (): CtxOp => local => symbol => {
       const scope = symbol in local.scope ? local.scope : symbol in global.scope ? global.scope : local.scope
       if (!(symbol in scope)) throw new ReferenceError(panic('symbol not defined', symbol))
-      return [(scope === global.scope ? 'global' : 'local') + '.get', '$' + symbol]
+      const type = scope[symbol]
+      return typeAs(type, [(scope === global.scope ? 'global' : 'local') + '.get', '$' + symbol])
     },
   }
 
@@ -325,7 +320,7 @@ export const compile = (node: Node, global: Context = { scope: {}, args: [] }) =
       'func',
       '$' + sym,
       ['export', `"${sym}"`],
-      ...args.map(x => ['param', '$' + x, 'f32']),
+      ...args.map(x => ['param', '$' + x, ctx.scope[x as Token]]),
       ...(body.length ? [['result', max(Type.i32, typeOf(body))]] : []),
       ...Object.entries(ctx.scope).map(([x, type]) => ['local', '$' + x, max(Type.i32, type)]),
       ...body,

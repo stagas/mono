@@ -47,7 +47,7 @@ export const parse: (input: string) => Node & {
 
       '||': [[4, 3], { led: bin }],
 
-      '&&': [[5, 4], { led: bin }],
+      '&&': [[5, 4], { led: (t, r, x) => [t.as('?'), [t.as('!='), t.as('0', 'num'), x], expr(r), t.as('0', 'num')] }],
 
       '|': [[6, 5], { led: bin }],
 
@@ -76,8 +76,26 @@ export const parse: (input: string) => Node & {
       '!': [[14, 1], { led: pre, nud: post(14) }],
       '~': [[14, 1], { led: pre, nud: post(14) }],
 
-      '++': [[15, 1], { led: (t, _, x) => [t.as('=+'), x], nud: post(14) }],
-      '--': [[15, 1], { led: (t, _, x) => [t.as('=-'), x], nud: post(14) }],
+      '++': [
+        [15, 1],
+        {
+          led: (t, _, x) => [t.as('='), x, [t.as('+'), x, t.as('1', 'num')]],
+          nud: t => {
+            const x = expr(14)
+            return [t.as('='), x, [t.as('+'), x, t.as('1', 'num')]]
+          },
+        },
+      ],
+      '--': [
+        [15, 1],
+        {
+          led: (t, _, x) => [t.as('='), x, [t.as('-'), x, t.as('1', 'num')]],
+          nud: t => {
+            const x = expr(14)
+            return [t.as('='), x, [t.as('-'), x, t.as('1', 'num')]]
+          },
+        },
+      ],
       '[': [[15, 15], { led: until(']', 0, (t, L, R) => [t, L, R]) }],
       '(': [[15, 0], { led: until(')', 0, (t, L, R) => [t.as('@'), L, R].filter(Boolean)), nud: until(')', 0, (_, __, x) => x) }],
       '.': [[15, 16], { led: bin }],

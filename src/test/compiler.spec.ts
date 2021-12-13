@@ -21,6 +21,10 @@ describe('compile', () => {
     expect(c('1+2')).toEqual('(i32.add (i32.const 1) (i32.const 2))')
   })
 
+  it('x+y add op', () => {
+    expect(c('1.5+1')).toEqual('(f32.add (f32.const 1.5) (f32.convert_i32_s (i32.const 1)))')
+  })
+
   // it('op w/ type cast i32 -> f32', () => {
   //   expect(c('1+2', {}, Type.f32)).toEqual('(f32.convert_i32_u (i32.add (i32.const 1) (i32.const 2)))')
   // })
@@ -300,7 +304,7 @@ describe('compile', () => {
       '(if (result i32) (i32.ne (i32.const 0) (i32.const 1)) (then (if (result i32) (i32.ne (i32.const 0) (i32.const 2)) (then (i32.const 3)) (else (i32.const 0)))) (else (i32.const 0)))'
     )
     expect(c('1&&2.5&&3')).toEqual(
-      '(if (result f32) (f32.ne (f32.const 0) (f32.convert_i32_s (i32.const 1))) (then (if (result f32) (f32.ne (f32.const 0) (f32.const 2.5)) (then (f32.convert_i32_u (i32.const 3))) (else (f32.const 0)))) (else (f32.const 0)))'
+      '(if (result i32) (i32.ne (i32.const 0) (i32.const 1)) (then (if (result i32) (f32.ne (f32.convert_i32_s (i32.const 0)) (f32.const 2.5)) (then (i32.const 3)) (else (i32.const 0)))) (else (i32.const 0)))'
     )
   })
 
@@ -376,35 +380,63 @@ describe('compile', () => {
   it('x<<=y variable shift left', () => {
     expect(c('a=1;a<<=1')).toEqual('(global.set $a (i32.const 1)) (global.set $a (i32.shl (global.get $a) (i32.const 1)))')
     expect(c('a=1.5;a<<=2.5')).toEqual(
-      '(global.set $a (f32.const 1.5)) (global.set $a (f32.convert_i32_u (i32.shl (global.get $a) (i32.trunc_f32_u (f32.const 2.5)))))'
+      '(global.set $a (f32.const 1.5)) (global.set $a (f32.convert_i32_u (i32.shl (i32.trunc_f32_u (global.get $a)) (i32.trunc_f32_u (f32.const 2.5)))))'
     )
   })
 
   it('x>>=y variable shift right', () => {
     expect(c('a=1;a>>=1')).toEqual('(global.set $a (i32.const 1)) (global.set $a (i32.shr_s (global.get $a) (i32.const 1)))')
     expect(c('a=1.5;a>>=2.5')).toEqual(
-      '(global.set $a (f32.const 1.5)) (global.set $a (f32.convert_i32_u (i32.shr_s (global.get $a) (i32.trunc_f32_u (f32.const 2.5)))))'
+      '(global.set $a (f32.const 1.5)) (global.set $a (f32.convert_i32_u (i32.shr_s (i32.trunc_f32_u (global.get $a)) (i32.trunc_f32_u (f32.const 2.5)))))'
     )
   })
 
   it('x&=y variable bitwise AND', () => {
     expect(c('a=1;a&=1')).toEqual('(global.set $a (i32.const 1)) (global.set $a (i32.and (global.get $a) (i32.const 1)))')
     expect(c('a=1.5;a&=2.5')).toEqual(
-      '(global.set $a (f32.const 1.5)) (global.set $a (f32.convert_i32_u (i32.and (global.get $a) (i32.trunc_f32_u (f32.const 2.5)))))'
+      '(global.set $a (f32.const 1.5)) (global.set $a (f32.convert_i32_u (i32.and (i32.trunc_f32_u (global.get $a)) (i32.trunc_f32_u (f32.const 2.5)))))'
     )
   })
 
   it('x^=y variable bitwise XOR', () => {
     expect(c('a=1;a^=1')).toEqual('(global.set $a (i32.const 1)) (global.set $a (i32.xor (global.get $a) (i32.const 1)))')
     expect(c('a=1.5;a^=2.5')).toEqual(
-      '(global.set $a (f32.const 1.5)) (global.set $a (f32.convert_i32_u (i32.xor (global.get $a) (i32.trunc_f32_u (f32.const 2.5)))))'
+      '(global.set $a (f32.const 1.5)) (global.set $a (f32.convert_i32_u (i32.xor (i32.trunc_f32_u (global.get $a)) (i32.trunc_f32_u (f32.const 2.5)))))'
     )
   })
 
   it('x|=y variable bitwise OR', () => {
     expect(c('a=1;a|=1')).toEqual('(global.set $a (i32.const 1)) (global.set $a (i32.or (global.get $a) (i32.const 1)))')
     expect(c('a=1.5;a|=2.5')).toEqual(
-      '(global.set $a (f32.const 1.5)) (global.set $a (f32.convert_i32_u (i32.or (global.get $a) (i32.trunc_f32_u (f32.const 2.5)))))'
+      '(global.set $a (f32.const 1.5)) (global.set $a (f32.convert_i32_u (i32.or (i32.trunc_f32_u (global.get $a)) (i32.trunc_f32_u (f32.const 2.5)))))'
+    )
+  })
+
+  it('++x variable add 1 pre', () => {
+    expect(c('a=1;++a')).toEqual('(global.set $a (i32.const 1)) (global.set $a (i32.add (global.get $a) (i32.const 1)))')
+    expect(c('a=1.5;++a')).toEqual(
+      '(global.set $a (f32.const 1.5)) (global.set $a (f32.add (global.get $a) (f32.convert_i32_s (i32.const 1))))'
+    )
+  })
+
+  it('x++ variable add 1 post', () => {
+    expect(c('a=1;a++')).toEqual('(global.set $a (i32.const 1)) (global.set $a (i32.add (global.get $a) (i32.const 1)))')
+    expect(c('a=1.5;a++')).toEqual(
+      '(global.set $a (f32.const 1.5)) (global.set $a (f32.add (global.get $a) (f32.convert_i32_s (i32.const 1))))'
+    )
+  })
+
+  it('--x variable sub 1 pre', () => {
+    expect(c('a=1;--a')).toEqual('(global.set $a (i32.const 1)) (global.set $a (i32.sub (global.get $a) (i32.const 1)))')
+    expect(c('a=1.5;--a')).toEqual(
+      '(global.set $a (f32.const 1.5)) (global.set $a (f32.sub (global.get $a) (f32.convert_i32_s (i32.const 1))))'
+    )
+  })
+
+  it('x-- variable sub 1 post', () => {
+    expect(c('a=1;a--')).toEqual('(global.set $a (i32.const 1)) (global.set $a (i32.sub (global.get $a) (i32.const 1)))')
+    expect(c('a=1.5;a--')).toEqual(
+      '(global.set $a (f32.const 1.5)) (global.set $a (f32.sub (global.get $a) (f32.convert_i32_s (i32.const 1))))'
     )
   })
 })
