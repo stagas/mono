@@ -1,8 +1,17 @@
 module.exports = {
-  testEnvironment: 'node', // or 'jsdom'
-  rootDir: 'src',
+  testEnvironment: 'node', // or 'jsdom',
+  rootDir: '.',
+  roots: ['<rootDir>/test/'],
   testMatch: ['**/*.spec.{js,jsx,ts,tsx}'],
-  coverageDirectory: '../coverage',
+  testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/test/web/'],
+  coverageDirectory: '<rootDir>/coverage',
+  collectCoverageFrom: ['src/**/*.{ts,tsx}'],
+  coverageProvider: 'v8',
+
+  // enable this for real typescript builds (slow but accurate)
+  // preset: 'ts-jest',
+
+  // enable this for fast, correct sourcemaps but not all features supported
   transform: {
     '\\.(js|jsx|ts|tsx)$': [
       '@stagas/sucrase-jest-plugin',
@@ -14,4 +23,20 @@ module.exports = {
       },
     ],
   },
+
+  // enable this for fast, incorrect sourcemaps but more features supported
+
+  // transform: {
+  //   '\\.(js|jsx|ts|tsx)$': [
+  //     '@swc-node/jest',
+  //     {
+  //       experimentalDecorators: true,
+  //       emitDecoratorMetadata: true,
+  //       react: {
+  //         pragma: 'h',
+  //         pragmaFrag: 'Fragment',
+  //       },
+  //     },
+  //   ],
+  // },
 }

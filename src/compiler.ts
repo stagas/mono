@@ -60,8 +60,8 @@ export interface Module {
 
 export { Type }
 
-export const compile = (node: Node, imports: Imports = {}) => {
-  const global = { scope: {}, args: [] }
+export const compile = (node: Node, scope: Scope = {}, imports: Imports = {}) => {
+  const global = { scope, args: [] }
   const contexts: Module['contexts'] = new Map()
   const funcs: Module['funcs'] = {}
 

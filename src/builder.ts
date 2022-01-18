@@ -1,24 +1,44 @@
-import { Imports, compile } from './compiler'
-import { parse } from './parser'
+import rfdc from 'rfdc'
 import make, * as wat from 'wat-compiler'
+import { Imports, Module, compile } from './compiler'
 import * as lib from './lib.wat'
+import { parse } from './parser'
 
-export const build = (s: string) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let modlib: any
+const copy = rfdc({ proto: true, circles: false })
+const imports: Imports = {}
+
+export const build = (s: string, scope = {}, extraLib = {}, extraRun = (_mod: Module) => []) => {
   console.time('build')
-  const libsrc = Object.values(lib).join('\n')
-  const modlib = wat.compile(wat.parse(wat.tokenize('(module ' + libsrc + ')')))
-  const imports: Imports = {}
 
-  for (const code of modlib.codes) {
-    const [params, result] = modlib.types[code.type_idx].split(',')
-    imports[code.name] = { params: params.split(' '), result: result.split(' ')[0] }
+  if (!modlib) {
+    console.time('lib')
+    const libsrc = Object.values(lib).join('\n') + '\n' + Object.values(extraLib).join('\n')
+    modlib = wat.compile(wat.parse(wat.tokenize('(module ' + libsrc + ')')))
+    for (const code of modlib.module.codes) {
+      const [params, result] = modlib.module.types[code.type_idx].split(',')
+      imports[code.name] = { params: params.split(' '), result: result.split(' ')[0] }
+    }
+    console.timeEnd('lib')
   }
 
-  const mod = compile(parse(s), imports).toString([libsrc])
-  const buffer = make(libsrc + '\n' + mod)
-  const wasmMod = new WebAssembly.Module(buffer)
-  const instance = new WebAssembly.Instance(wasmMod)
+  // console.time('parse')
+  const ast = parse(s)
+  // console.timeEnd('parse')
+
+  // console.time('compile')
+  const mod = compile(ast, scope, imports)
+  // console.timeEnd('compile')
+
+  // console.time('make')
+  const buffer = make(mod.toString(extraRun(mod)), { metrics: false }, copy(modlib))
+  // console.timeEnd('make')
+
   console.timeEnd('build')
 
-  return instance.exports as Record<string, (...args: unknown[]) => unknown>
+  return {
+    module: mod,
+    buffer,
+  }
 }

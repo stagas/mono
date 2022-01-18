@@ -1,6 +1,6 @@
-import { createParser, joinRegExp, Node, Token } from 'tinypratt'
+import { Node, Token, createParser, joinRegExp } from 'tinypratt'
 
-export { Node, Token }
+export type { Node, Token }
 
 export const parse: (input: string) => Node & {
   panic: (message: string, token: Token) => string
@@ -8,8 +8,8 @@ export const parse: (input: string) => Node & {
   joinRegExp(
     [
       /(?<ids>[a-zA-Z_$][a-zA-Z0-9_$]*)/,
-      /(?<num>inf|nan|\d[\d_]*(\.((e[+\-]?)?[\d]+)+[kBb]*|(e[+\-]?[\d]+)?[kBb]*))/,
-      /(?<ops>\+\+|\-\-|\+=|-=|\*=|\/=|%=|<<=|>>=|&=|\^=|\|=|&&|!&|\|\||!=|==|>=|<=|>>|<<|\.\.|[\[\]\(\)\{\}\\\"'`,\-~+*\/%=<>?!:;.|&^@]{1})/,
+      /(?<num>inf|nan|\d[\d_]*(\.((e[+-]?)?[\d]+)+[kBb]*|(e[+-]?[\d]+)?[kBb]*))/,
+      /(?<ops>\+\+|--|\+=|-=|\*=|\/=|%=|<<=|>>=|&=|\^=|\|=|&&|!&|\|\||!=|==|>=|<=|>>|<<|\.\.|[[\](){}\\"'`,\-~+*/%=<>?!:;.|&^@]{1})/,
       /(?<nul>\s+)/,
       /(?<err>.)/,
     ],

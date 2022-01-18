@@ -1,6 +1,6 @@
-import { compile } from '../compiler'
-import { parse } from '../parser'
-import { S0, SExpr } from '../sexpr'
+import { compile } from '../src/compiler'
+import { parse } from '../src/parser'
+import { S0, SExpr } from '../src/sexpr'
 
 // helpers
 const deepToString = (x: string | SExpr): string | SExpr => (Array.isArray(x) ? x.map(deepToString) : '' + x)

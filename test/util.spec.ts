@@ -1,6 +1,6 @@
-import { flatten } from '../util'
-import { parse } from '../parser'
-import { S0 } from '../sexpr'
+import { parse } from '../src/parser'
+import { S0 } from '../src/sexpr'
+import { flatten } from '../src/util'
 
 describe('util', () => {
   it('flattten', () => {

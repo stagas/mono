@@ -8,7 +8,7 @@ export const flatten = (sym: string, x: Node): Node[] =>
       : [x]
     : [x]
 
-/** merges or pUSHes `obj` to array `arr` */
+/** Merges or pUSHes `obj` to array `arr` */
 export const mush = (arr: (unknown & { id: string })[], obj: Record<string, unknown> & { id: string }) => {
   const el = arr.find(x => x.id == obj.id)
   if (el) Object.assign(el, obj)

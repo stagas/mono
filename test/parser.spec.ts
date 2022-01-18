@@ -1,4 +1,4 @@
-import { parse } from '../parser'
+import { parse } from '../src/parser'
 
 describe('parse', () => {
   it('parses correctly', () => {
