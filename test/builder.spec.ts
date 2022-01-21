@@ -10,5 +10,7 @@ const b = (s: string) => {
 describe('build', () => {
   it('builds', () => {
     expect(b('a(x,y)=sin(x%y+cos(y%4))').a(10, 2)).toEqual(-0.40341752767562866)
+    expect(b('a(x[1..2],y)=sin(x%y+cos(y%4))').a(10, 2)).toEqual(-0.40341752767562866)
+    expect(b('a(x[1..2]=1.5,y)=sin(x%y+cos(y%4))').a(10, 2)).toEqual(-0.40341752767562866)
   })
 })

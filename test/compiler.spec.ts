@@ -97,6 +97,13 @@ describe('compile', () => {
     ])
   })
 
+  it('function declaration with multiple args ranges', () => {
+    expect(func('a', 'a(b[1..2],c,y[3..5])=1')).toEqual([[['b'],['c'],['y']], [['i32.const', '1']]])
+    const mod = compile(parse('a(b[1..2],c,y[3..5])=1'))
+    const ctx = mod.contexts.get(mod.funcs['a'])!
+    expect(ctx.args).toMatchSnapshot()
+  })
+
   it('function declaration with arg range expression', () => {
     expect(func('a', 'a(b[1+2..2+3])=1')).toEqual([[['b']], [['i32.const', '1']]])
     const mod = compile(parse('a(b[1+2..2+3])=1'))
