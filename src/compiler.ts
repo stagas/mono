@@ -109,10 +109,11 @@ export const compile = (node: Node, scope: Scope = {}, imports: Imports = {}) =>
     }
 
   /** defines a function */
-  const funcDef = (ctx: Context, ops: OpTable, sym: string, args: Node[], rhs: Node) => {
+  const funcDef = (ctx: Context, ops: OpTable, sym: Token | string, args: Node[], rhs: Node) => {
     const body = map(flatten(';', rhs), ctx, ops)
     const func: Func = [map(args, ctx, OpArgs), typeAs(typeOf(body.at(-1)), body)]
     funcs[sym] = func
+    ctx.sym = sym as Token
     contexts.set(func, ctx)
     return func
   }
