@@ -30,7 +30,7 @@
     "dist"
   ],
   "scripts": {
-    "build:watch": "tsc --outDir dist/esm --module esnext --watch",
+    "build:watch": "tsc --outDir dist/esm --module esnext --watch & tsc --outDir dist/cjs --watch",
     "cov:watch": "jest --coverage --watchAll",
     "test": "npm run test:node && npm run test:web",
     "test:node": "jest",
@@ -46,6 +46,7 @@
     "clean": "rimraf dist",
     "prepack": "npm run clean && npm run build",
     "prepack:dry": "npm pack --dry-run",
+    "prepush": "npm run lint && npm run test",
     "prepare": "husky install"
   },
   "devDependencies": {

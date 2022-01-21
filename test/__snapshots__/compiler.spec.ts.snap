@@ -1,0 +1,56 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`compile function declaration with multiple args ranges 1`] = `
+Array [
+  Object {
+    "id": Token {
+      "0": "b",
+      "group": "ids",
+    },
+    "range": Array [
+      Array [
+        "i32.const",
+        Token {
+          "0": "1",
+          "group": "num",
+        },
+      ],
+      Array [
+        "i32.const",
+        Token {
+          "0": "2",
+          "group": "num",
+        },
+      ],
+    ],
+  },
+  Object {
+    "id": Token {
+      "0": "c",
+      "group": "ids",
+    },
+  },
+  Object {
+    "id": Token {
+      "0": "y",
+      "group": "ids",
+    },
+    "range": Array [
+      Array [
+        "i32.const",
+        Token {
+          "0": "3",
+          "group": "num",
+        },
+      ],
+      Array [
+        "i32.const",
+        Token {
+          "0": "5",
+          "group": "num",
+        },
+      ],
+    ],
+  },
+]
+`;

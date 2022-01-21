@@ -1,7 +1,7 @@
 module.exports = {
   testEnvironment: 'node', // or 'jsdom',
   rootDir: '.',
-  roots: ['<rootDir>/test/'],
+  roots: ['<rootDir>/test/', '<rootDir>/src'],
   testMatch: ['**/*.spec.{js,jsx,ts,tsx}'],
   testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/test/web/'],
   coverageDirectory: '<rootDir>/coverage',

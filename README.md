@@ -18,8 +18,10 @@ mono is a low level language for audio expressions that compiles to wasm
 ## Install
 
 ```sh
-$ npm i mono
+$ npm i @stagas/mono
 ```
+
+**-- work in progress --**
 
 ## API
 
