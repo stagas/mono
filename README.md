@@ -67,13 +67,13 @@ $ npm i @stagas/mono
 
 ### todo
 
-[src/compiler.ts:88-88](https://github.com/stagas/mono/blob/b243e9fd68d2933bba5406b8bbf9ac04414e9c2b/src/compiler.ts#L88-L88 "Source code on GitHub")
+[src/compiler.ts:89-89](https://github.com/stagas/mono/blob/cad3d0307ea083bee7ffe47cda5c94560c58c097/src/compiler.ts#L89-L89 "Source code on GitHub")
 
 todo is a "not implemented" marker for ops
 
 ### bin
 
-[src/compiler.ts:91-94](https://github.com/stagas/mono/blob/b243e9fd68d2933bba5406b8bbf9ac04414e9c2b/src/compiler.ts#L91-L94 "Source code on GitHub")
+[src/compiler.ts:92-95](https://github.com/stagas/mono/blob/cad3d0307ea083bee7ffe47cda5c94560c58c097/src/compiler.ts#L92-L95 "Source code on GitHub")
 
 constructs a binary op of least type `type`
 
@@ -86,7 +86,7 @@ Returns **[Op](#op)**&#x20;
 
 ### typebin
 
-[src/compiler.ts:97-100](https://github.com/stagas/mono/blob/b243e9fd68d2933bba5406b8bbf9ac04414e9c2b/src/compiler.ts#L97-L100 "Source code on GitHub")
+[src/compiler.ts:98-101](https://github.com/stagas/mono/blob/cad3d0307ea083bee7ffe47cda5c94560c58c097/src/compiler.ts#L98-L101 "Source code on GitHub")
 
 constructs a binary op of exact type `type`
 
@@ -99,7 +99,7 @@ Returns **[Op](#op)**&#x20;
 
 ### eq
 
-[src/compiler.ts:103-109](https://github.com/stagas/mono/blob/b243e9fd68d2933bba5406b8bbf9ac04414e9c2b/src/compiler.ts#L103-L109 "Source code on GitHub")
+[src/compiler.ts:104-110](https://github.com/stagas/mono/blob/cad3d0307ea083bee7ffe47cda5c94560c58c097/src/compiler.ts#L104-L110 "Source code on GitHub")
 
 constructs an equality op
 
@@ -111,7 +111,7 @@ Returns **[Op](#op)**&#x20;
 
 ### funcDef
 
-[src/compiler.ts:112-118](https://github.com/stagas/mono/blob/b243e9fd68d2933bba5406b8bbf9ac04414e9c2b/src/compiler.ts#L112-L118 "Source code on GitHub")
+[src/compiler.ts:113-120](https://github.com/stagas/mono/blob/cad3d0307ea083bee7ffe47cda5c94560c58c097/src/compiler.ts#L113-L120 "Source code on GitHub")
 
 defines a function
 
@@ -119,13 +119,13 @@ defines a function
 
 *   `ctx` **Context**&#x20;
 *   `ops` **OpTable**&#x20;
-*   `sym` **[string](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)**&#x20;
+*   `sym` **(Token | [string](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String))**&#x20;
 *   `args` **[Array](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array)<[Node](https://developer.mozilla.org/docs/Web/API/Node/nextSibling)>**&#x20;
 *   `rhs` **[Node](https://developer.mozilla.org/docs/Web/API/Node/nextSibling)**&#x20;
 
 ### Op
 
-[src/compiler.ts:121-288](https://github.com/stagas/mono/blob/b243e9fd68d2933bba5406b8bbf9ac04414e9c2b/src/compiler.ts#L121-L288 "Source code on GitHub")
+[src/compiler.ts:123-299](https://github.com/stagas/mono/blob/cad3d0307ea083bee7ffe47cda5c94560c58c097/src/compiler.ts#L123-L299 "Source code on GitHub")
 
 primary optable
 
@@ -133,7 +133,7 @@ Type: OpTable
 
 ### OpArgs
 
-[src/compiler.ts:291-302](https://github.com/stagas/mono/blob/b243e9fd68d2933bba5406b8bbf9ac04414e9c2b/src/compiler.ts#L291-L302 "Source code on GitHub")
+[src/compiler.ts:302-313](https://github.com/stagas/mono/blob/cad3d0307ea083bee7ffe47cda5c94560c58c097/src/compiler.ts#L302-L313 "Source code on GitHub")
 
 arguments optable
 
@@ -141,7 +141,7 @@ Type: OpTable
 
 ### build
 
-[src/compiler.ts:305-318](https://github.com/stagas/mono/blob/b243e9fd68d2933bba5406b8bbf9ac04414e9c2b/src/compiler.ts#L305-L318 "Source code on GitHub")
+[src/compiler.ts:316-329](https://github.com/stagas/mono/blob/cad3d0307ea083bee7ffe47cda5c94560c58c097/src/compiler.ts#L316-L329 "Source code on GitHub")
 
 builds a `node` under context `ctx` and optable `ops`
 
@@ -155,7 +155,7 @@ Returns **SExpr**&#x20;
 
 ### map
 
-[src/compiler.ts:321-325](https://github.com/stagas/mono/blob/b243e9fd68d2933bba5406b8bbf9ac04414e9c2b/src/compiler.ts#L321-L325 "Source code on GitHub")
+[src/compiler.ts:332-336](https://github.com/stagas/mono/blob/cad3d0307ea083bee7ffe47cda5c94560c58c097/src/compiler.ts#L332-L336 "Source code on GitHub")
 
 builds an array of `nodes` under context `ctx` and optable `ops`
 
@@ -169,7 +169,7 @@ Returns **[Array](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Gl
 
 ### typeOf
 
-[src/typed.ts:31-31](https://github.com/stagas/mono/blob/b243e9fd68d2933bba5406b8bbf9ac04414e9c2b/src/typed.ts#L31-L31 "Source code on GitHub")
+[src/typed.ts:31-31](https://github.com/stagas/mono/blob/cad3d0307ea083bee7ffe47cda5c94560c58c097/src/typed.ts#L31-L31 "Source code on GitHub")
 
 looks up and returns the type of `x`, if found, otherwise returns type `any`
 
@@ -181,7 +181,7 @@ Returns **Type**&#x20;
 
 ### typeAs
 
-[src/typed.ts:34-34](https://github.com/stagas/mono/blob/b243e9fd68d2933bba5406b8bbf9ac04414e9c2b/src/typed.ts#L34-L34 "Source code on GitHub")
+[src/typed.ts:34-34](https://github.com/stagas/mono/blob/cad3d0307ea083bee7ffe47cda5c94560c58c097/src/typed.ts#L34-L34 "Source code on GitHub")
 
 marks sexpr `x` to be of type `type`
 
@@ -192,7 +192,7 @@ marks sexpr `x` to be of type `type`
 
 ### cast
 
-[src/typed.ts:37-46](https://github.com/stagas/mono/blob/b243e9fd68d2933bba5406b8bbf9ac04414e9c2b/src/typed.ts#L37-L46 "Source code on GitHub")
+[src/typed.ts:37-46](https://github.com/stagas/mono/blob/cad3d0307ea083bee7ffe47cda5c94560c58c097/src/typed.ts#L37-L46 "Source code on GitHub")
 
 creates a cast operation if the given value `x` doesn't satisfy `type`
 
@@ -203,7 +203,7 @@ creates a cast operation if the given value `x` doesn't satisfy `type`
 
 ### castAll
 
-[src/typed.ts:49-49](https://github.com/stagas/mono/blob/b243e9fd68d2933bba5406b8bbf9ac04414e9c2b/src/typed.ts#L49-L49 "Source code on GitHub")
+[src/typed.ts:49-49](https://github.com/stagas/mono/blob/cad3d0307ea083bee7ffe47cda5c94560c58c097/src/typed.ts#L49-L49 "Source code on GitHub")
 
 casts all `values` to be of type `type`
 
@@ -216,7 +216,7 @@ Returns **SExpr**&#x20;
 
 ### hi
 
-[src/typed.ts:52-55](https://github.com/stagas/mono/blob/b243e9fd68d2933bba5406b8bbf9ac04414e9c2b/src/typed.ts#L52-L55 "Source code on GitHub")
+[src/typed.ts:52-55](https://github.com/stagas/mono/blob/cad3d0307ea083bee7ffe47cda5c94560c58c097/src/typed.ts#L52-L55 "Source code on GitHub")
 
 returns the highest precision type of the given values
 
@@ -228,7 +228,7 @@ Returns **Type**&#x20;
 
 ### max
 
-[src/typed.ts:58-60](https://github.com/stagas/mono/blob/b243e9fd68d2933bba5406b8bbf9ac04414e9c2b/src/typed.ts#L58-L60 "Source code on GitHub")
+[src/typed.ts:58-60](https://github.com/stagas/mono/blob/cad3d0307ea083bee7ffe47cda5c94560c58c097/src/typed.ts#L58-L60 "Source code on GitHub")
 
 returns at least the precision of the given type among the given types
 
@@ -241,7 +241,7 @@ Returns **Type**&#x20;
 
 ### top
 
-[src/typed.ts:63-67](https://github.com/stagas/mono/blob/b243e9fd68d2933bba5406b8bbf9ac04414e9c2b/src/typed.ts#L63-L67 "Source code on GitHub")
+[src/typed.ts:63-67](https://github.com/stagas/mono/blob/cad3d0307ea083bee7ffe47cda5c94560c58c097/src/typed.ts#L63-L67 "Source code on GitHub")
 
 types an operation with the correct prefix (f32 or i32) and type casts the values to satisfy the op
 
@@ -254,7 +254,7 @@ Returns **SExpr**&#x20;
 
 ### infer
 
-[src/typed.ts:70-75](https://github.com/stagas/mono/blob/b243e9fd68d2933bba5406b8bbf9ac04414e9c2b/src/typed.ts#L70-L75 "Source code on GitHub")
+[src/typed.ts:70-75](https://github.com/stagas/mono/blob/cad3d0307ea083bee7ffe47cda5c94560c58c097/src/typed.ts#L70-L75 "Source code on GitHub")
 
 infers the type of a token literal string: bool for 0 or 1, i32 for integers and f32 for floats
 
@@ -266,7 +266,7 @@ Returns **Type**&#x20;
 
 ### flatten
 
-[src/util.ts:4-9](https://github.com/stagas/mono/blob/b243e9fd68d2933bba5406b8bbf9ac04414e9c2b/src/util.ts#L4-L9 "Source code on GitHub")
+[src/util.ts:4-9](https://github.com/stagas/mono/blob/cad3d0307ea083bee7ffe47cda5c94560c58c097/src/util.ts#L4-L9 "Source code on GitHub")
 
 flattens a node that is left hand side recursing on symbol `sym`
 
@@ -279,7 +279,7 @@ Returns **[Array](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Gl
 
 ### mush
 
-[src/util.ts:12-16](https://github.com/stagas/mono/blob/b243e9fd68d2933bba5406b8bbf9ac04414e9c2b/src/util.ts#L12-L16 "Source code on GitHub")
+[src/util.ts:12-16](https://github.com/stagas/mono/blob/cad3d0307ea083bee7ffe47cda5c94560c58c097/src/util.ts#L12-L16 "Source code on GitHub")
 
 Merges or pUSHes `obj` to array `arr`
 
