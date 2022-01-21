@@ -130,10 +130,16 @@ export const compile = (node: Node, scope: Scope = {}, imports: Imports = {}) =>
       if (Array.isArray(lhs)) {
         if (lhs[0] != '@') throw new SyntaxError(panic('invalid assignment', lhs[0]))
         const [sym, args] = [lhs[1], flatten(',', lhs[2]).filter(Boolean)] as [Token, Node[]]
-        const scope = Object.fromEntries(args.map(x => [
-          Array.isArray(x) ? // has range
-          Array.isArray(x[1]) ? // has default
-          x[1][1] : x[1] : x, Type.f32]))
+        const scope = Object.fromEntries(
+          args.map(x => [
+            Array.isArray(x) // has range
+              ? Array.isArray(x[1]) // has default
+                ? x[1][1]
+                : x[1]
+              : x,
+            Type.f32,
+          ])
+        )
         const ctx = { scope, args: [] }
         funcDef(ctx, ops, sym, args, rhs)
         return []
