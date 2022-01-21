@@ -3,13 +3,14 @@ import make, * as wat from 'wat-compiler'
 import { Imports, Module, compile } from './compiler'
 import * as lib from './lib.wat'
 import { parse } from './parser'
+import { SExpr } from './sexpr'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let modlib: any
 const copy = rfdc({ proto: true, circles: false })
 const imports: Imports = {}
 
-export const build = (s: string, scope = {}, extraLib = {}, extraRun = (_mod: Module) => []) => {
+export const build = (s: string, scope = {}, extraLib = {}, extraRun = (_mod: Module): SExpr => []) => {
   console.time('build')
 
   if (!modlib) {

@@ -29,22 +29,23 @@ interface OpTable {
   [k: string]: null | (() => CtxOp) | Op | Op[]
 }
 
-interface Scope {
+export interface Scope {
   [k: string]: Type
 }
 
-interface Arg {
+export interface Arg {
   id: Token
   default?: SExpr
   range?: SExpr
 }
 
-interface Context {
+export interface Context {
+  sym?: Token
   scope: Scope
   args: Arg[]
 }
 
-type Func = [SExpr, SExpr]
+export type Func = [SExpr, SExpr]
 
 export interface Imports {
   [k: string]: { params: Type[]; result: Type }
@@ -55,7 +56,7 @@ export interface Module {
   funcs: Record<string, Func>
   contexts: Map<Func, Context>
   valueOf(): SExpr
-  toString(include?: string[]): string
+  toString(include?: SExpr): string
 }
 
 export { Type }
@@ -339,7 +340,7 @@ export const compile = (node: Node, scope: Scope = {}, imports: Imports = {}) =>
     valueOf() {
       return this.body
     },
-    toString(include = []) {
+    toString(include: SExpr = []) {
       return S(['module', ...include, ...this.body])
     },
   }
