@@ -96,6 +96,7 @@ export const parse: (input: string) => Node & {
           },
         },
       ],
+      '{': [[15, 0], { nud: until('}', 0, (t, _, x) => [t, x]) }],
       '[': [[15, 15], { led: until(']', 0, (t, L, R) => [t, L, R]) }],
       '(': [[15, 0], { led: until(')', 0, (t, L, R) => [t.as('@'), L, R].filter(Boolean)), nud: until(')', 0, (_, __, x) => x) }],
       '.': [[15, 16], { led: bin }],

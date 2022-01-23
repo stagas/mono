@@ -42,6 +42,7 @@ export interface Arg {
 export interface Context {
   sym?: Token
   scope: Scope
+  offsets: Record<string, number>
   args: Arg[]
 }
 
@@ -62,7 +63,8 @@ export interface Module {
 export { Type }
 
 export const compile = (node: Node, scope: Scope = {}, imports: Imports = {}) => {
-  const global = { scope, args: [] }
+  // implementations need to provide global scope: `global_mem_ptr: Type.i32`
+  const global = { scope, offsets: {}, args: [] }
   const contexts: Module['contexts'] = new Map()
   const funcs: Module['funcs'] = {}
 
@@ -77,6 +79,7 @@ export const compile = (node: Node, scope: Scope = {}, imports: Imports = {}) =>
     funcs[name] = func
     const ctx: Context = {
       scope: {},
+      offsets: {},
       args: params.map((x: string, i) => ({
         id: i.toString(),
         default: typeAs(x as Type, [x + '.const', '0']),
@@ -126,23 +129,38 @@ export const compile = (node: Node, scope: Scope = {}, imports: Imports = {}) =>
     '..': todo,
 
     '=': (): CtxOp => (local, ops) => (lhs, rhs) => {
-      // f()=x : function declaration
       if (Array.isArray(lhs)) {
-        if (lhs[0] != '@') throw new SyntaxError(panic('invalid assignment', lhs[0]))
-        const [sym, args] = [lhs[1], flatten(',', lhs[2]).filter(Boolean)] as [Token, Node[]]
-        const scope = Object.fromEntries(
-          args.map(x => [
-            Array.isArray(x) // has range
-              ? Array.isArray(x[1]) // has default
-                ? x[1][1]
-                : x[1]
-              : x,
-            Type.f32,
+        // f()=x : function declaration
+        if (lhs[0] == '@') {
+          const [sym, args] = [lhs[1], flatten(',', lhs[2]).filter(Boolean)] as [Token, Node[]]
+          const scope = Object.fromEntries(
+            args.map(x => [
+              Array.isArray(x) // has range
+                ? Array.isArray(x[1]) // has default
+                  ? x[1][1]
+                  : x[1]
+                : x,
+              Type.f32,
+            ])
+          )
+          const ctx = { scope, offsets: {}, args: [] }
+          funcDef(ctx, ops, sym, args, rhs)
+          return []
+        }
+        // {x,y}=(z,w) : store operation
+        else if (lhs[0] == '{') {
+          const vars = flatten(',', lhs[1]) as Token[]
+          const vals = map(flatten(',', rhs), local, ops)
+          return vars.map((sym, i) => [
+            `f32.store offset=${local.offsets[sym]}`,
+            ['local.get', '$local_mem_ptr'],
+            cast(Type.f32, vals[i]),
           ])
-        )
-        const ctx = { scope, args: [] }
-        funcDef(ctx, ops, sym, args, rhs)
-        return []
+        }
+        // invalid
+        else {
+          throw new SyntaxError(panic('invalid assignment', lhs[0]))
+        }
       }
       // x=y : variable assignment
       else {
@@ -250,6 +268,24 @@ export const compile = (node: Node, scope: Scope = {}, imports: Imports = {}) =>
     // ~x : bitwise NOT
     '~': x => top(Type.i32, ['not', x]),
 
+    // {x,y,z} : load operations
+    '{': (): CtxOp => local => rhs => {
+      local.scope['local_mem_ptr'] = Type.i32
+      const vars = (<Token[]>flatten(',', rhs)).map((sym: Token, i) => {
+        const offset = i * 4
+        const op = typeAs(Type.f32, [`f32.load offset=${offset}`, ['local.get', '$local_mem_ptr']])
+        local.scope[sym] = typeOf(op)
+        local.offsets[sym] = offset
+        return typeAs(Type.f32, ['local.set', '$' + sym, op])
+      })
+      // prettier-ignore
+      return [
+        ['local.set', '$local_mem_ptr', ['global.get', '$global_mem_ptr']],
+        ...vars,
+        ['global.set', '$global_mem_ptr', ['i32.add', ['i32.const', '' + vars.length * 4],
+        ['global.get', '$global_mem_ptr']]]
+      ]
+    },
     '[': todo,
     '(': todo,
     '@': (): CtxOp => (local, ops) => (sym, rhs) => {

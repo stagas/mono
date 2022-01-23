@@ -98,7 +98,7 @@ describe('compile', () => {
   })
 
   it('function declaration with multiple args ranges', () => {
-    expect(func('a', 'a(b[1..2],c,y[3..5])=1')).toEqual([[['b'],['c'],['y']], [['i32.const', '1']]])
+    expect(func('a', 'a(b[1..2],c,y[3..5])=1')).toEqual([[['b'], ['c'], ['y']], [['i32.const', '1']]])
     const mod = compile(parse('a(b[1..2],c,y[3..5])=1'))
     const ctx = mod.contexts.get(mod.funcs['a'])!
     expect(ctx.args).toMatchSnapshot()
@@ -444,6 +444,27 @@ describe('compile', () => {
     expect(c('a=1;a--')).toEqual('(global.set $a (i32.const 1)) (global.set $a (i32.sub (global.get $a) (i32.const 1)))')
     expect(c('a=1.5;a--')).toEqual(
       '(global.set $a (f32.const 1.5)) (global.set $a (f32.sub (global.get $a) (f32.convert_i32_s (i32.const 1))))'
+    )
+  })
+
+  it('load operations', () => {
+    expect(fc('f', 'f()={x}')).toEqual(
+      '(local.set $local_mem_ptr (global.get $global_mem_ptr)) (local.set $x (f32.load offset=0 (local.get $local_mem_ptr))) (global.set $global_mem_ptr (i32.add (i32.const 4) (global.get $global_mem_ptr)))'
+    )
+    expect(fc('f', 'f()={x,y}')).toEqual(
+      '(local.set $local_mem_ptr (global.get $global_mem_ptr)) (local.set $x (f32.load offset=0 (local.get $local_mem_ptr))) (local.set $y (f32.load offset=4 (local.get $local_mem_ptr))) (global.set $global_mem_ptr (i32.add (i32.const 8) (global.get $global_mem_ptr)))'
+    )
+  })
+
+  it('store operations', () => {
+    expect(fc('f', 'f()=({x};{x}=1.5)')).toEqual(
+      '(local.set $local_mem_ptr (global.get $global_mem_ptr)) (local.set $x (f32.load offset=0 (local.get $local_mem_ptr))) (global.set $global_mem_ptr (i32.add (i32.const 4) (global.get $global_mem_ptr))) (f32.store offset=0 (local.get $local_mem_ptr) (f32.const 1.5))'
+    )
+    expect(fc('f', 'f()=({x,y};{x,y}=(1.5,2))')).toEqual(
+      '(local.set $local_mem_ptr (global.get $global_mem_ptr)) (local.set $x (f32.load offset=0 (local.get $local_mem_ptr))) (local.set $y (f32.load offset=4 (local.get $local_mem_ptr))) (global.set $global_mem_ptr (i32.add (i32.const 8) (global.get $global_mem_ptr))) (f32.store offset=0 (local.get $local_mem_ptr) (f32.const 1.5)) (f32.store offset=4 (local.get $local_mem_ptr) (f32.convert_i32_u (i32.const 2)))'
+    )
+    expect(fc('f', 'f()=({x,y};{y,x}=(1.5,2))')).toEqual(
+      '(local.set $local_mem_ptr (global.get $global_mem_ptr)) (local.set $x (f32.load offset=0 (local.get $local_mem_ptr))) (local.set $y (f32.load offset=4 (local.get $local_mem_ptr))) (global.set $global_mem_ptr (i32.add (i32.const 8) (global.get $global_mem_ptr))) (f32.store offset=4 (local.get $local_mem_ptr) (f32.const 1.5)) (f32.store offset=0 (local.get $local_mem_ptr) (f32.convert_i32_u (i32.const 2)))'
     )
   })
 })

@@ -59,6 +59,9 @@ describe('parse', () => {
     expect('' + parse('x[y[1]]')).toEqual('([ x ([ y 1))')
     expect('' + parse(`a ? b : c ? d : e`)).toEqual('(? a b (? c d e))')
     expect('' + parse('a = 0 ? b : c = d')).toEqual('(= a (? 0 b (= c d)))')
+    expect('' + parse('{x,y}')).toEqual('({ (, x y))')
+    expect('' + parse('{x,y,z}')).toEqual('({ (, (, x y) z))')
+    expect('' + parse('{x,y,z}={a,b,c}')).toEqual('(= ({ (, (, x y) z)) ({ (, (, a b) c)))')
   })
 
   it('throws on errors', () => {
