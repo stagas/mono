@@ -1,3 +1,5 @@
 export * from './parser'
 export * from './compiler'
-export * from './builder'
+export * from './linker'
+export * from './vm'
+export * from './syntax'

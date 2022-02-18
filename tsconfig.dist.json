@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "exclude": [
+    "bench",
+    "example",
+    "test",
+    "**/*.spec.ts",
+    "**/*.spec.tsx"
+  ],
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "base-custom-element"
+  }
+}

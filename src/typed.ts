@@ -1,5 +1,5 @@
-import { SExpr } from './sexpr'
 import { Token } from './parser'
+import { SExpr } from './sexpr'
 
 export enum Type {
   any = 'any',
@@ -10,20 +10,27 @@ export enum Type {
 
 export const Types: Type[] = [Type.any, Type.bool, Type.i32, Type.f32]
 
+export const W = (x: Type) => Types.indexOf(x)
+
+/** returns at least the precision of the given type among the given types */
+export const max = (type: Type, ...types: Type[]): Type => {
+  return Types[Math.max(Types.indexOf(type), ...types.map(x => Types.indexOf(x)))]
+}
+
 export const Typed = (panic: (s: string, t: string) => string) => {
   const types = new Map<object | string, Type>()
 
   const OpTypeCast: Record<Type, Partial<Record<Type, string>>> = {
     [Type.any]: {},
     [Type.f32]: {
-      [Type.i32]: 'f32.convert_i32_u',
-      [Type.bool]: 'f32.convert_i32_s',
+      [Type.i32]: 'f32.convert_i32_s',
+      [Type.bool]: 'f32.convert_i32_u',
     },
     [Type.i32]: {
-      [Type.f32]: 'i32.trunc_f32_u',
+      [Type.f32]: 'i32.trunc_f32_s',
     },
     [Type.bool]: {
-      [Type.f32]: 'i32.trunc_f32_s',
+      [Type.f32]: 'i32.trunc_f32_u',
     },
   }
 
@@ -31,17 +38,21 @@ export const Typed = (panic: (s: string, t: string) => string) => {
   const typeOf = (x: undefined | string | SExpr): Type => ((x && types.get(x)) ?? Type.any) as Type
 
   /** marks sexpr `x` to be of type `type` */
-  const typeAs = (type: Type, x: SExpr) => (types.set(x, type), x)
+  const typeAs = (type: Type, x: SExpr) => {
+    if (typeof x === 'string') return x // TODO: why are tokens infected with typeAs? only SExpressions should
+    types.set(x, type)
+    return x
+  }
 
   /** creates a cast operation if the given value `x` doesn't satisfy `type` */
-  const cast = (type: Type, x: SExpr) => {
-    const childType = typeOf(x)
-    if (childType != type) {
-      const castOp = OpTypeCast[type][childType]
-      if (!castOp) return typeAs(type, x) // noop cast, but change the type for x
-      return typeAs(type, [castOp, x])
+  const cast = (targetType: Type, x: SExpr) => {
+    const sourceType = typeOf(x)
+    if (sourceType != targetType) {
+      const castOp = OpTypeCast[targetType][sourceType]
+      if (!castOp) return typeAs(targetType, x) // noop cast, but change the type for x
+      return typeAs(targetType, [castOp, x])
     } else {
-      return typeAs(type, x) // x is any or unknown, so set the type for x
+      return typeAs(targetType, x) // x is any or unknown, so set the type for x
     }
   }
 
@@ -50,13 +61,8 @@ export const Typed = (panic: (s: string, t: string) => string) => {
 
   /** returns the highest precision type of the given values */
   const hi = (...values: SExpr): Type => {
-    const weights = values.map(x => Types.indexOf(typeOf(x)))
+    const weights = values.filter(Boolean).map(x => W(typeOf(x)))
     return Types[Math.max(...weights)]
-  }
-
-  /** returns at least the precision of the given type among the given types */
-  const max = (type: Type, ...types: Type[]): Type => {
-    return Types[Math.max(Types.indexOf(type), ...types.map(x => Types.indexOf(x)))]
   }
 
   /** types an operation with the correct prefix (f32 or i32) and type casts the values to satisfy the op */

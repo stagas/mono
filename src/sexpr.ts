@@ -6,7 +6,7 @@ export const S = (p: string | SExpr, x = 0): string => {
   return Array.isArray(p)
     ? p.length
       ? Array.isArray(p[0])
-        ? p.map(e => S(e, x + 2)).join(' ') // TODO: ident
+        ? p.map(e => '\n' + S(e, x + 2)).join(' ') // TODO: ident
         : `${' '.repeat(x)}(${p[0]} ${p
             .slice(1)
             .map(e => (Array.isArray(e) ? '\n' : '') + S(e, x + 2))

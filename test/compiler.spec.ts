@@ -1,470 +1,449 @@
 import { compile } from '../src/compiler'
 import { parse } from '../src/parser'
-import { S0, SExpr } from '../src/sexpr'
+import { S, S0 } from '../src/sexpr'
 
 // helpers
-const deepToString = (x: string | SExpr): string | SExpr => (Array.isArray(x) ? x.map(deepToString) : '' + x)
-const func = (sym: string, s: string) => deepToString([...compile(parse(s)).funcs[sym]!])
-const fc = (sym: string, s: string, global?: any) => S0(compile(parse(s), global).funcs[sym].pop()!)
+// const deepToString = (x: string | SExpr): string | SExpr => (Array.isArray(x) ? x.map(deepToString) : '' + x)
+// const func = (sym: string, s: string) => deepToString([...compile(parse(s)).funcs[sym].body!])
+const fc = (sym: string, s: string, global?: any) => S(compile(parse(s), global).funcs[sym].body!)
 const c = (s: string, global?: any) => fc('__start__', s, global)
+const bodyOf = (s: string) => S(compile(parse(s)).body)
 
 describe('compile', () => {
   // it('literal', () => {
-  //   expect(compile('1' as Node).funcs['__start__'].pop()).toEqual([['i32.const', '1']])
+  //   expect(compile('1' as Node).funcs['__start__'].pop()).toMatchSnapshot()
   // })
 
   it('parser node', () => {
-    expect(c('1')).toEqual('(i32.const 1)')
+    expect(c('1')).toMatchSnapshot()
   })
 
   it('x+y add op', () => {
-    expect(c('1+2')).toEqual('(i32.add (i32.const 1) (i32.const 2))')
+    expect(c('1+2')).toMatchSnapshot()
   })
 
   it('x+y add op', () => {
-    expect(c('1.5+1')).toEqual('(f32.add (f32.const 1.5) (f32.convert_i32_s (i32.const 1)))')
+    expect(c('1.5+1')).toMatchSnapshot()
   })
 
   // it('op w/ type cast i32 -> f32', () => {
-  //   expect(c('1+2', {}, Type.f32)).toEqual('(f32.convert_i32_u (i32.add (i32.const 1) (i32.const 2)))')
+  //   expect(c('1+2', {}, Type.f32)).toMatchSnapshot()
   // })
 
   it('x+y add w/ type cast i32 -> i32', () => {
-    expect(c('1+2')).toEqual('(i32.add (i32.const 1) (i32.const 2))')
+    expect(c('1+2')).toMatchSnapshot()
   })
 
   it('x+y add w/ type cast i32 -> bool', () => {
-    expect(c('1+2')).toEqual('(i32.add (i32.const 1) (i32.const 2))')
+    expect(c('1+2')).toMatchSnapshot()
   })
 
   it('x+y add w/ type cast bool -> i32', () => {
-    expect(c('1+1')).toEqual('(i32.add (i32.const 1) (i32.const 1))')
+    expect(c('1+1')).toMatchSnapshot()
   })
 
   // it('op w/ type cast bool -> f32', () => {
-  //   expect(c('1+1', {}, Type.f32)).toEqual('(f32.convert_i32_u (i32.add (i32.const 1) (i32.const 1)))')
+  //   expect(c('1+1', {}, Type.f32)).toMatchSnapshot()
   // })
 
   it('!x logical Not', () => {
-    expect(c('!1')).toEqual('(i32.eqz (i32.const 1))')
+    expect(c('!1')).toMatchSnapshot()
   })
 
   it('!x logical Not w/ f32', () => {
-    expect(c('!1.0')).toEqual('(i32.eqz (i32.trunc_f32_s (f32.const 1.0)))')
+    expect(c('!1.0')).toMatchSnapshot()
   })
 
   it('-x negate i32', () => {
-    expect(c('-1')).toEqual('(i32.mul (i32.const -1) (i32.const 1))')
+    expect(c('-1')).toMatchSnapshot()
   })
 
   it('-x negate f32', () => {
-    expect(c('-1.0')).toEqual('(f32.mul (f32.const -1) (f32.const 1.0))')
+    expect(c('-1.0')).toMatchSnapshot()
   })
 
   it('-x negate bool', () => {
-    expect(c('-!1')).toEqual('(i32.mul (i32.const -1) (i32.eqz (i32.const 1)))')
+    expect(c('-!1')).toMatchSnapshot()
   })
 
-  it('function declaration', () => {
-    expect(func('a', 'a(b)=1')).toEqual([[['b']], [['i32.const', '1']]])
-    expect(func('a', 'a(b,c)=1')).toEqual([[['b'], ['c']], [['i32.const', '1']]])
-  })
+  // it('function declaration', () => {
+  //   expect(func('a', 'a(b)=1')).toMatchSnapshot()
+  //   expect(func('a', 'a(b,c)=1')).toMatchSnapshot()
+  // })
 
   it('function declaration with arg default literal', () => {
-    expect(func('a', 'a(b=1)=1')).toEqual([[['b']], [['i32.const', '1']]])
     const mod = compile(parse('a(b=1)=1'))
-    const ctx = mod.contexts.get(mod.funcs['a'])!
-    expect(ctx.args).toMatchObject([
-      {
-        id: { value: 'b' },
-        default: ['i32.const', { value: '1' }],
-      },
-    ])
+    const ctx = mod.funcs.a.context
+    expect(ctx.params).toMatchSnapshot()
+  })
+
+  it('function declaration with exported arguments', () => {
+    const mod = compile(parse('a(.b=1)=1'))
+    const ctx = mod.funcs.a.context
+    expect(ctx.params).toMatchSnapshot()
   })
 
   it('function declaration with arg range', () => {
-    expect(func('a', 'a(b[1..2])=1')).toEqual([[['b']], [['i32.const', '1']]])
     const mod = compile(parse('a(b[1..2])=1'))
-    const ctx = mod.contexts.get(mod.funcs['a'])!
-    expect(ctx.args).toMatchObject([
-      {
-        id: { value: 'b' },
-        range: [
-          ['i32.const', { value: '1' }],
-          ['i32.const', { value: '2' }],
-        ],
-      },
-    ])
+    const ctx = mod.funcs.a.context
+    expect(ctx.params).toMatchSnapshot()
   })
 
   it('function declaration with multiple args ranges', () => {
-    expect(func('a', 'a(b[1..2],c,y[3..5])=1')).toEqual([[['b'], ['c'], ['y']], [['i32.const', '1']]])
     const mod = compile(parse('a(b[1..2],c,y[3..5])=1'))
-    const ctx = mod.contexts.get(mod.funcs['a'])!
-    expect(ctx.args).toMatchSnapshot()
+    const ctx = mod.funcs.a.context
+    expect(ctx.params).toMatchSnapshot()
   })
 
   it('function declaration with arg range expression', () => {
-    expect(func('a', 'a(b[1+2..2+3])=1')).toEqual([[['b']], [['i32.const', '1']]])
     const mod = compile(parse('a(b[1+2..2+3])=1'))
-    const ctx = mod.contexts.get(mod.funcs['a'])!
-    expect(ctx.args).toMatchObject([
-      {
-        id: { value: 'b' },
-        range: [
-          ['i32.add', ['i32.const', { value: '1' }], ['i32.const', { value: '2' }]],
-          ['i32.add', ['i32.const', { value: '2' }], ['i32.const', { value: '3' }]],
-        ],
-      },
-    ])
+    const ctx = mod.funcs.a.context
+    expect(ctx.params).toMatchSnapshot()
   })
 
   it('function declaration with arg range expression and default', () => {
-    expect(func('a', 'a(b[1+2..2+3]=4)=1')).toEqual([[['b']], [['i32.const', '1']]])
     const mod = compile(parse('a(b[1+2..2+3]=4)=1'))
-    const ctx = mod.contexts.get(mod.funcs['a'])!
-    expect(ctx.args).toMatchObject([
-      {
-        id: { value: 'b' },
-        default: ['i32.const', { value: '4' }],
-        range: [
-          ['i32.add', ['i32.const', { value: '1' }], ['i32.const', { value: '2' }]],
-          ['i32.add', ['i32.const', { value: '2' }], ['i32.const', { value: '3' }]],
-        ],
-      },
-    ])
+    const ctx = mod.funcs.a.context
+    expect(ctx.params).toMatchSnapshot()
   })
 
   it('function declaration with arg range expression and default expression', () => {
-    expect(func('a', 'a(b[1+2..2+3]=1.5+2.5)=1')).toEqual([[['b']], [['i32.const', '1']]])
     const mod = compile(parse('a(b[1+2..2+3]=1.5+2.5)=1'))
-    const ctx = mod.contexts.get(mod.funcs['a'])!
-    expect(ctx.args).toMatchObject([
-      {
-        id: { value: 'b' },
-        default: ['f32.add', ['f32.const', { value: '1.5' }], ['f32.const', { value: '2.5' }]],
-        range: [
-          ['i32.add', ['i32.const', { value: '1' }], ['i32.const', { value: '2' }]],
-          ['i32.add', ['i32.const', { value: '2' }], ['i32.const', { value: '3' }]],
-        ],
-      },
-    ])
+    const ctx = mod.funcs.a.context
+    expect(ctx.params).toMatchSnapshot()
   })
 
   it('function declaration with arg range and default', () => {
-    expect(func('a', 'a(b[1..2]=1.5)=1')).toEqual([[['b']], [['i32.const', '1']]])
     const mod = compile(parse('a(b[1..2]=1.5)=1'))
-    const ctx = mod.contexts.get(mod.funcs['a'])!
-    expect(ctx.args).toMatchObject([
-      {
-        id: { value: 'b' },
-        default: ['f32.const', { value: '1.5' }],
-        range: [
-          ['i32.const', { value: '1' }],
-          ['i32.const', { value: '2' }],
-        ],
-      },
-    ])
+    const ctx = mod.funcs.a.context
+    expect(ctx.params).toMatchSnapshot()
   })
 
   it('function declaration with arg range and default expression', () => {
-    expect(func('a', 'a(b[1..2]=1.5+2.5)=1')).toEqual([[['b']], [['i32.const', '1']]])
     const mod = compile(parse('a(b[1..2]=1.5+2.5)=1'))
-    const ctx = mod.contexts.get(mod.funcs['a'])!
-    expect(ctx.args).toMatchObject([
-      {
-        id: { value: 'b' },
-        default: ['f32.add', ['f32.const', { value: '1.5' }], ['f32.const', { value: '2.5' }]],
-        range: [
-          ['i32.const', { value: '1' }],
-          ['i32.const', { value: '2' }],
-        ],
-      },
-    ])
+    const ctx = mod.funcs.a.context
+    expect(ctx.params).toMatchSnapshot()
+  })
+
+  it('function declaration with expression referencing variables', () => {
+    const mod = compile(parse('x=10;a(b[1..2]=x/2)=1;f()=a()'))
+    const ctx = mod.funcs.a.context
+    expect(ctx.params).toMatchSnapshot()
+    expect(S0(mod.body)).toMatchSnapshot()
+  })
+
+  it('function declaration with range referencing variables', () => {
+    const mod = compile(parse('x=10;a(b[1..x]=x/2)=1;f()=a()'))
+    const ctx = mod.funcs.a.context
+    expect(ctx.params).toMatchSnapshot()
+    expect(S0(mod.body)).toMatchSnapshot()
   })
 
   it('function declaration with arg default expression', () => {
-    expect(func('a', 'a(b=1)=1')).toEqual([[['b']], [['i32.const', '1']]])
     const mod = compile(parse('a(b=1+2)=1'))
-    const ctx = mod.contexts.get(mod.funcs['a'])!
-    expect(ctx.args).toMatchObject([
-      {
-        id: { value: 'b' },
-        default: ['i32.add', ['i32.const', { value: '1' }], ['i32.const', { value: '2' }]],
-      },
-    ])
+    const ctx = mod.funcs.a.context
+    expect(ctx.params).toMatchSnapshot()
   })
 
-  it('assignment global', () => {
-    expect(c('a=1')).toEqual('(global.set $a (i32.const 1))')
-    expect(c('a=1;b=2')).toEqual('(global.set $a (i32.const 1)) (global.set $b (i32.const 2))')
-  })
+  describe('assignment', () => {
+    it('global', () => {
+      expect(c('a=1')).toMatchSnapshot()
+      expect(c('a=1;b=2')).toMatchSnapshot()
+    })
 
-  it('assignment local', () => {
-    expect(fc('f', 'f()=a=1')).toEqual('(local.set $a (i32.const 1))')
-  })
+    it('multi value', () => {
+      expect(c('(a,b)=(1,2)')).toMatchSnapshot()
+    })
 
-  it('assignment find scope', () => {
-    expect(fc('f', 'a=1;f()=(a=2;b=3)')).toEqual('(global.set $a (i32.const 2)) (local.set $b (i32.const 3))')
+    it('local', () => {
+      expect(fc('f', 'f()=(a=1)')).toMatchSnapshot()
+    })
+
+    it('find scope', () => {
+      expect(fc('f', 'a=1;f()=(a=2;b=3)')).toMatchSnapshot()
+    })
   })
 
   it('parameters', () => {
-    expect(fc('f', 'f(a)=a=1')).toEqual('(local.set $a (f32.convert_i32_s (i32.const 1)))')
+    expect(fc('f', 'f(a)=(a=1)')).toMatchSnapshot()
   })
 
   it('parameters shadow globals', () => {
-    expect(fc('f', 'a=1;f()=a=2')).toEqual('(global.set $a (i32.const 2))')
-    expect(fc('f', 'a=1;f(a)=a=2')).toEqual('(local.set $a (f32.convert_i32_u (i32.const 2)))')
+    expect(fc('f', 'a=1;f()=(a=2)')).toMatchSnapshot()
+    expect(fc('f', 'a=1;f(a)=(a=2)')).toMatchSnapshot()
   })
 
   it('function call', () => {
-    expect(c('a()=1;a(1,2)')).toEqual('(call $a)')
-    expect(c('a(x,y)=1;a(1,2)')).toEqual('(call $a (f32.convert_i32_s (i32.const 1)) (f32.convert_i32_u (i32.const 2)))')
-    expect(c('a()=1;a()')).toEqual('(call $a)')
-    expect(c('a(x)=1;a(1.0)')).toEqual('(call $a (f32.const 1.0))')
+    expect(c('a()=1;a(1,2)')).toMatchSnapshot()
+    expect(c('a(x,y)=1;a(1,2)')).toMatchSnapshot()
+    expect(c('a()=1;a()')).toMatchSnapshot()
+    expect(c('a(x)=1;a(1.0)')).toMatchSnapshot()
   })
 
   it('function call arg missing use default', () => {
-    expect(c('a(b=1)=1;a()')).toEqual('(call $a (i32.const 1))')
-    expect(c('a(b=1.5)=1;a()')).toEqual('(call $a (f32.const 1.5))')
+    expect(c('a(b=1)=1;a()')).toMatchSnapshot()
+    expect(c('a(b=1.5)=1;a()')).toMatchSnapshot()
   })
 
   it('function call arg missing no default, use argument range', () => {
-    expect(c('a(b[1..2])=1;a()')).toEqual('(call $a (i32.const 1))')
+    expect(c('a(b[1..2])=1;a()')).toMatchSnapshot()
   })
 
   it('function call arg passed, use argument range for type cast', () => {
-    expect(c('a(b[1.5..2.5])=1;a(1)')).toEqual('(call $a (f32.convert_i32_s (i32.const 1)))')
+    expect(c('a(b[1.5..2.5])=1;a(1)')).toMatchSnapshot()
   })
 
   it('variable get global', () => {
-    expect(c('a=1;a')).toEqual('(global.set $a (i32.const 1)) (global.get $a)')
+    expect(c('a=1;a')).toMatchSnapshot()
   })
 
   it('variable get local', () => {
-    expect(fc('f', 'f()=(a=1;a)')).toEqual('(local.set $a (i32.const 1)) (local.get $a)')
+    expect(fc('f', 'f()=(a=1;a)')).toMatchSnapshot()
     const mod = compile(parse('f()=(a=1;a)'))
-    expect(S0(mod.body)).toEqual(
-      '(start $__start__) (func $f (export "f") (result i32) (local $a i32) (local.set $a (i32.const 1)) (local.get $a)) (func $__start__ (export "__start__"))'
-    )
+    expect(S0(mod.body)).toMatchSnapshot()
+    // expect(S0(mod.body)).toMatchSnapshot()
+    //   '(start $__start__) (func $f (export "f") (result i32) (local $a i32) (local.set $a (i32.const 1)) (local.get $a)) (func $__start__ (export "__start__"))'
+    // )
   })
 
   it('variable get global from within local context', () => {
-    expect(fc('f', 'a=2.0;f()=a')).toEqual('(global.get $a)')
+    expect(fc('f', 'a=2.0;f()=a')).toMatchSnapshot()
   })
 
+  // it('weird global case', () => {
+  //   expect(
+  //     fc(
+  //       'f',
+  //       `
+  //   t=1.0;
+  //   st=1.0;
+  //   f(x[300..500]=440)=-(t-st)
+  // `
+  //     )
+  //   ).toMatchSnapshot()
+  // })
+
   it('parameter shadow global variable', () => {
-    expect(fc('f', 'a=2.0;f(a)=a')).toEqual('(local.get $a)')
+    expect(fc('f', 'a=2.0;f(a)=a')).toMatchSnapshot()
   })
 
   it('x?y:z ternary', () => {
-    expect(c('0?1:2')).toEqual('(if (result i32) (i32.const 0) (then (i32.const 1)) (else (i32.const 2)))')
-    expect(c('1?1:2')).toEqual('(if (result i32) (i32.const 1) (then (i32.const 1)) (else (i32.const 2)))')
-    expect(c('1?1.2:2')).toEqual(
-      '(if (result f32) (i32.const 1) (then (f32.const 1.2)) (else (f32.convert_i32_u (i32.const 2))))'
-    )
-    expect(c('1.5?1.2:2')).toEqual(
-      '(if (result f32) (i32.trunc_f32_s (f32.const 1.5)) (then (f32.const 1.2)) (else (f32.convert_i32_u (i32.const 2))))'
-    )
+    expect(c('0?1:2')).toMatchSnapshot()
+    expect(c('1?1:2')).toMatchSnapshot()
+    expect(c('1?1.2:2')).toMatchSnapshot()
+    expect(c('1.5?1.2:2')).toMatchSnapshot()
   })
 
   it('x%y modulo', () => {
-    expect(c('1%2')).toEqual('(i32.rem_u (i32.const 1) (i32.const 2))')
-    expect(c('0%1')).toEqual('(i32.rem_s (i32.const 0) (i32.const 1))')
-    expect(c('1.2%1')).toEqual('(call $mod (f32.const 1.2) (f32.convert_i32_s (i32.const 1)))')
-    expect(c('1.2%2')).toEqual('(call $mod (f32.const 1.2) (f32.convert_i32_u (i32.const 2)))')
+    expect(c('1%2')).toMatchSnapshot()
+    expect(c('0%1')).toMatchSnapshot()
+    expect(c('1.2%1')).toMatchSnapshot()
+    expect(c('1.2%2')).toMatchSnapshot()
   })
 
   it('x<<y bitwise shift left', () => {
-    expect(c('1<<2')).toEqual('(i32.shl (i32.const 1) (i32.const 2))')
-    expect(c('1.2<<2')).toEqual('(i32.shl (i32.trunc_f32_u (f32.const 1.2)) (i32.const 2))')
+    expect(c('1<<2')).toMatchSnapshot()
+    expect(c('1.2<<2')).toMatchSnapshot()
   })
 
   it('x>>y bitwise shift right', () => {
-    expect(c('1>>2')).toEqual('(i32.shr_s (i32.const 1) (i32.const 2))')
-    expect(c('1.2>>2')).toEqual('(i32.shr_s (i32.trunc_f32_u (f32.const 1.2)) (i32.const 2))')
+    expect(c('1>>2')).toMatchSnapshot()
+    expect(c('1.2>>2')).toMatchSnapshot()
   })
 
   it('x&y bitwise AND', () => {
-    expect(c('1&2')).toEqual('(i32.and (i32.const 1) (i32.const 2))')
-    expect(c('1.2&2')).toEqual('(i32.and (i32.trunc_f32_u (f32.const 1.2)) (i32.const 2))')
+    expect(c('1&2')).toMatchSnapshot()
+    expect(c('1.2&2')).toMatchSnapshot()
   })
 
-  it('x^y bitwise XOR', () => {
-    expect(c('1^2')).toEqual('(i32.xor (i32.const 1) (i32.const 2))')
-    expect(c('1.2^2')).toEqual('(i32.xor (i32.trunc_f32_u (f32.const 1.2)) (i32.const 2))')
-  })
+  // it('x^y bitwise XOR', () => {
+  //   expect(c('1^2')).toMatchSnapshot()
+  //   expect(c('1.2^2')).toMatchSnapshot()
+  // })
 
   it('x|y bitwise OR', () => {
-    expect(c('1|2')).toEqual('(i32.or (i32.const 1) (i32.const 2))')
-    expect(c('1.2|2')).toEqual('(i32.or (i32.trunc_f32_u (f32.const 1.2)) (i32.const 2))')
+    expect(c('1|2')).toMatchSnapshot()
+    expect(c('1.2|2')).toMatchSnapshot()
   })
 
   it('~y bitwise NOT', () => {
-    expect(c('~1')).toEqual('(i32.not (i32.const 1))')
-    expect(c('~1.2')).toEqual('(i32.not (i32.trunc_f32_u (f32.const 1.2)))')
+    expect(c('~1')).toMatchSnapshot()
+    expect(c('~1.2')).toMatchSnapshot()
   })
 
   it('x&&y logical And', () => {
-    expect(c('1&&2')).toEqual('(if (result i32) (i32.ne (i32.const 0) (i32.const 1)) (then (i32.const 2)) (else (i32.const 0)))')
-    expect(c('1&&2&&3')).toEqual(
-      '(if (result i32) (i32.ne (i32.const 0) (i32.const 1)) (then (if (result i32) (i32.ne (i32.const 0) (i32.const 2)) (then (i32.const 3)) (else (i32.const 0)))) (else (i32.const 0)))'
-    )
-    expect(c('1&&2.5&&3')).toEqual(
-      '(if (result i32) (i32.ne (i32.const 0) (i32.const 1)) (then (if (result i32) (f32.ne (f32.convert_i32_s (i32.const 0)) (f32.const 2.5)) (then (i32.const 3)) (else (i32.const 0)))) (else (i32.const 0)))'
-    )
+    expect(c('1&&2')).toMatchSnapshot()
+    expect(c('1&&2&&3')).toMatchSnapshot()
+    expect(c('1&&2.5&&3')).toMatchSnapshot()
   })
 
   it('x||y logical Or', () => {
-    expect(c('1||2')).toEqual(
-      '(if (result i32) (i32.ne (i32.const 0) (local.tee __lhs__i32 (i32.const 1))) (then (local.get __lhs__i32)) (else (i32.const 2)))'
-    )
-    expect(c('1||2||3')).toEqual(
-      '(if (result i32) (i32.ne (i32.const 0) (local.tee __lhs__i32 (i32.const 1))) (then (local.get __lhs__i32)) (else (if (result i32) (i32.ne (i32.const 0) (local.tee __lhs__i32 (i32.const 2))) (then (local.get __lhs__i32)) (else (i32.const 3)))))'
-    )
-    expect(c('1||2.5||3')).toEqual(
-      '(if (result f32) (f32.ne (f32.const 0) (local.tee __lhs__f32 (f32.convert_i32_s (i32.const 1)))) (then (local.get __lhs__f32)) (else (if (result f32) (f32.ne (f32.const 0) (local.tee __lhs__f32 (f32.const 2.5))) (then (local.get __lhs__f32)) (else (f32.convert_i32_u (i32.const 3))))))'
-    )
+    expect(c('1||2')).toMatchSnapshot()
+    expect(c('1||2||3')).toMatchSnapshot()
+    expect(c('1||2.5||3')).toMatchSnapshot()
   })
 
   it('x==y equality', () => {
-    expect(c('1==2')).toEqual('(i32.eq (i32.const 1) (i32.const 2))')
-    expect(c('1.2==2.2')).toEqual('(f32.eq (f32.const 1.2) (f32.const 2.2))')
+    expect(c('1==2')).toMatchSnapshot()
+    expect(c('1.2==2.2')).toMatchSnapshot()
   })
 
   it('x!=y non-equality', () => {
-    expect(c('1!=2')).toEqual('(i32.ne (i32.const 1) (i32.const 2))')
-    expect(c('1.2!=2.2')).toEqual('(f32.ne (f32.const 1.2) (f32.const 2.2))')
+    expect(c('1!=2')).toMatchSnapshot()
+    expect(c('1.2!=2.2')).toMatchSnapshot()
   })
 
   it('x<y less than', () => {
-    expect(c('1<2')).toEqual('(i32.lt_s (i32.const 1) (i32.const 2))')
-    expect(c('1.2<2.2')).toEqual('(f32.lt (f32.const 1.2) (f32.const 2.2))')
+    expect(c('1<2')).toMatchSnapshot()
+    expect(c('1.2<2.2')).toMatchSnapshot()
   })
 
   it('x>y greater than', () => {
-    expect(c('1>2')).toEqual('(i32.gt_s (i32.const 1) (i32.const 2))')
-    expect(c('1.2>2.2')).toEqual('(f32.gt (f32.const 1.2) (f32.const 2.2))')
+    expect(c('1>2')).toMatchSnapshot()
+    expect(c('1.2>2.2')).toMatchSnapshot()
   })
 
   it('x<=y less than or equal', () => {
-    expect(c('1<=2')).toEqual('(i32.le_s (i32.const 1) (i32.const 2))')
-    expect(c('1.2<=2.2')).toEqual('(f32.le (f32.const 1.2) (f32.const 2.2))')
+    expect(c('1<=2')).toMatchSnapshot()
+    expect(c('1.2<=2.2')).toMatchSnapshot()
   })
 
   it('x>=y greater than or equal', () => {
-    expect(c('1>=2')).toEqual('(i32.ge_s (i32.const 1) (i32.const 2))')
-    expect(c('1.2>=2.2')).toEqual('(f32.ge (f32.const 1.2) (f32.const 2.2))')
+    expect(c('1>=2')).toMatchSnapshot()
+    expect(c('1.2>=2.2')).toMatchSnapshot()
   })
 
   it('x+=y variable add', () => {
-    expect(c('a=1;a+=1')).toEqual('(global.set $a (i32.const 1)) (global.set $a (i32.add (global.get $a) (i32.const 1)))')
-    expect(c('a=1.5;a+=2.5')).toEqual('(global.set $a (f32.const 1.5)) (global.set $a (f32.add (global.get $a) (f32.const 2.5)))')
+    expect(c('a=1;a+=1')).toMatchSnapshot()
+    expect(c('a=1.5;a+=2.5')).toMatchSnapshot()
   })
 
   it('x-=y variable sub', () => {
-    expect(c('a=1;a-=1')).toEqual('(global.set $a (i32.const 1)) (global.set $a (i32.sub (global.get $a) (i32.const 1)))')
-    expect(c('a=1.5;a-=2.5')).toEqual('(global.set $a (f32.const 1.5)) (global.set $a (f32.sub (global.get $a) (f32.const 2.5)))')
+    expect(c('a=1;a-=1')).toMatchSnapshot()
+    expect(c('a=1.5;a-=2.5')).toMatchSnapshot()
   })
 
   it('x*=y variable mul', () => {
-    expect(c('a=1;a*=1')).toEqual('(global.set $a (i32.const 1)) (global.set $a (i32.mul (global.get $a) (i32.const 1)))')
-    expect(c('a=1.5;a*=2.5')).toEqual('(global.set $a (f32.const 1.5)) (global.set $a (f32.mul (global.get $a) (f32.const 2.5)))')
+    expect(c('a=1;a*=1')).toMatchSnapshot()
+    expect(c('a=1.5;a*=2.5')).toMatchSnapshot()
   })
 
   it('x/=y variable div', () => {
-    expect(c('a=1;a/=1')).toEqual('(global.set $a (i32.const 1)) (global.set $a (i32.div (global.get $a) (i32.const 1)))')
-    expect(c('a=1.5;a/=2.5')).toEqual('(global.set $a (f32.const 1.5)) (global.set $a (f32.div (global.get $a) (f32.const 2.5)))')
+    expect(c('a=1;a/=1')).toMatchSnapshot()
+    expect(c('a=1.5;a/=2.5')).toMatchSnapshot()
   })
 
   it('x%=y variable mod', () => {
-    expect(c('a=1;a%=1')).toEqual('(global.set $a (i32.const 1)) (global.set $a (i32.rem_s (global.get $a) (i32.const 1)))')
-    expect(c('a=1.5;a%=2.5')).toEqual(
-      '(global.set $a (f32.const 1.5)) (global.set $a (call $mod (global.get $a) (f32.const 2.5)))'
-    )
+    expect(c('a=1;a%=1')).toMatchSnapshot()
+    expect(c('a=1.5;a%=2.5')).toMatchSnapshot()
   })
 
   it('x<<=y variable shift left', () => {
-    expect(c('a=1;a<<=1')).toEqual('(global.set $a (i32.const 1)) (global.set $a (i32.shl (global.get $a) (i32.const 1)))')
-    expect(c('a=1.5;a<<=2.5')).toEqual(
-      '(global.set $a (f32.const 1.5)) (global.set $a (f32.convert_i32_u (i32.shl (i32.trunc_f32_u (global.get $a)) (i32.trunc_f32_u (f32.const 2.5)))))'
-    )
+    expect(c('a=1;a<<=1')).toMatchSnapshot()
+    expect(c('a=1.5;a<<=2.5')).toMatchSnapshot()
   })
 
   it('x>>=y variable shift right', () => {
-    expect(c('a=1;a>>=1')).toEqual('(global.set $a (i32.const 1)) (global.set $a (i32.shr_s (global.get $a) (i32.const 1)))')
-    expect(c('a=1.5;a>>=2.5')).toEqual(
-      '(global.set $a (f32.const 1.5)) (global.set $a (f32.convert_i32_u (i32.shr_s (i32.trunc_f32_u (global.get $a)) (i32.trunc_f32_u (f32.const 2.5)))))'
-    )
+    expect(c('a=1;a>>=1')).toMatchSnapshot()
+    expect(c('a=1.5;a>>=2.5')).toMatchSnapshot()
   })
 
   it('x&=y variable bitwise AND', () => {
-    expect(c('a=1;a&=1')).toEqual('(global.set $a (i32.const 1)) (global.set $a (i32.and (global.get $a) (i32.const 1)))')
-    expect(c('a=1.5;a&=2.5')).toEqual(
-      '(global.set $a (f32.const 1.5)) (global.set $a (f32.convert_i32_u (i32.and (i32.trunc_f32_u (global.get $a)) (i32.trunc_f32_u (f32.const 2.5)))))'
-    )
+    expect(c('a=1;a&=1')).toMatchSnapshot()
+    expect(c('a=1.5;a&=2.5')).toMatchSnapshot()
   })
 
-  it('x^=y variable bitwise XOR', () => {
-    expect(c('a=1;a^=1')).toEqual('(global.set $a (i32.const 1)) (global.set $a (i32.xor (global.get $a) (i32.const 1)))')
-    expect(c('a=1.5;a^=2.5')).toEqual(
-      '(global.set $a (f32.const 1.5)) (global.set $a (f32.convert_i32_u (i32.xor (i32.trunc_f32_u (global.get $a)) (i32.trunc_f32_u (f32.const 2.5)))))'
-    )
-  })
+  // it('x^=y variable bitwise XOR', () => {
+  //   expect(c('a=1;a^=1')).toMatchSnapshot()
+  //   expect(c('a=1.5;a^=2.5')).toMatchSnapshot()
+  //     '(global.set $a (f32.const 1.5)) (global.set $a (f32.convert_i32_u (i32.xor (i32.trunc_f32_u (global.get $a)) (i32.trunc_f32_u (f32.const 2.5)))))'
+  //   )
+  // })
 
   it('x|=y variable bitwise OR', () => {
-    expect(c('a=1;a|=1')).toEqual('(global.set $a (i32.const 1)) (global.set $a (i32.or (global.get $a) (i32.const 1)))')
-    expect(c('a=1.5;a|=2.5')).toEqual(
-      '(global.set $a (f32.const 1.5)) (global.set $a (f32.convert_i32_u (i32.or (i32.trunc_f32_u (global.get $a)) (i32.trunc_f32_u (f32.const 2.5)))))'
-    )
+    expect(c('a=1;a|=1')).toMatchSnapshot()
+    expect(c('a=1.5;a|=2.5')).toMatchSnapshot()
   })
 
   it('++x variable add 1 pre', () => {
-    expect(c('a=1;++a')).toEqual('(global.set $a (i32.const 1)) (global.set $a (i32.add (global.get $a) (i32.const 1)))')
-    expect(c('a=1.5;++a')).toEqual(
-      '(global.set $a (f32.const 1.5)) (global.set $a (f32.add (global.get $a) (f32.convert_i32_s (i32.const 1))))'
-    )
+    expect(c('a=1;++a')).toMatchSnapshot()
+    expect(c('a=1.5;++a')).toMatchSnapshot()
   })
 
   it('x++ variable add 1 post', () => {
-    expect(c('a=1;a++')).toEqual('(global.set $a (i32.const 1)) (global.set $a (i32.add (global.get $a) (i32.const 1)))')
-    expect(c('a=1.5;a++')).toEqual(
-      '(global.set $a (f32.const 1.5)) (global.set $a (f32.add (global.get $a) (f32.convert_i32_s (i32.const 1))))'
-    )
+    expect(c('a=1;a++')).toMatchSnapshot()
+    expect(c('a=1.5;a++')).toMatchSnapshot()
   })
 
   it('--x variable sub 1 pre', () => {
-    expect(c('a=1;--a')).toEqual('(global.set $a (i32.const 1)) (global.set $a (i32.sub (global.get $a) (i32.const 1)))')
-    expect(c('a=1.5;--a')).toEqual(
-      '(global.set $a (f32.const 1.5)) (global.set $a (f32.sub (global.get $a) (f32.convert_i32_s (i32.const 1))))'
-    )
+    expect(c('a=1;--a')).toMatchSnapshot()
+    expect(c('a=1.5;--a')).toMatchSnapshot()
   })
 
   it('x-- variable sub 1 post', () => {
-    expect(c('a=1;a--')).toEqual('(global.set $a (i32.const 1)) (global.set $a (i32.sub (global.get $a) (i32.const 1)))')
-    expect(c('a=1.5;a--')).toEqual(
-      '(global.set $a (f32.const 1.5)) (global.set $a (f32.sub (global.get $a) (f32.convert_i32_s (i32.const 1))))'
-    )
+    expect(c('a=1;a--')).toMatchSnapshot()
+    expect(c('a=1.5;a--')).toMatchSnapshot()
   })
 
   it('load operations', () => {
-    expect(fc('f', 'f()={x}')).toEqual(
-      '(local.set $local_mem_ptr (global.get $global_mem_ptr)) (local.set $x (f32.load offset=0 (local.get $local_mem_ptr))) (global.set $global_mem_ptr (i32.add (i32.const 4) (global.get $global_mem_ptr)))'
-    )
-    expect(fc('f', 'f()={x,y}')).toEqual(
-      '(local.set $local_mem_ptr (global.get $global_mem_ptr)) (local.set $x (f32.load offset=0 (local.get $local_mem_ptr))) (local.set $y (f32.load offset=4 (local.get $local_mem_ptr))) (global.set $global_mem_ptr (i32.add (i32.const 8) (global.get $global_mem_ptr)))'
-    )
+    expect(fc('f', 'f()={x}')).toMatchSnapshot()
+    expect(fc('f', 'f()={x,y}')).toMatchSnapshot()
   })
 
   it('store operations', () => {
-    expect(fc('f', 'f()=({x};{x}=1.5)')).toEqual(
-      '(local.set $local_mem_ptr (global.get $global_mem_ptr)) (local.set $x (f32.load offset=0 (local.get $local_mem_ptr))) (global.set $global_mem_ptr (i32.add (i32.const 4) (global.get $global_mem_ptr))) (f32.store offset=0 (local.get $local_mem_ptr) (f32.const 1.5))'
-    )
-    expect(fc('f', 'f()=({x,y};{x,y}=(1.5,2))')).toEqual(
-      '(local.set $local_mem_ptr (global.get $global_mem_ptr)) (local.set $x (f32.load offset=0 (local.get $local_mem_ptr))) (local.set $y (f32.load offset=4 (local.get $local_mem_ptr))) (global.set $global_mem_ptr (i32.add (i32.const 8) (global.get $global_mem_ptr))) (f32.store offset=0 (local.get $local_mem_ptr) (f32.const 1.5)) (f32.store offset=4 (local.get $local_mem_ptr) (f32.convert_i32_u (i32.const 2)))'
-    )
-    expect(fc('f', 'f()=({x,y};{y,x}=(1.5,2))')).toEqual(
-      '(local.set $local_mem_ptr (global.get $global_mem_ptr)) (local.set $x (f32.load offset=0 (local.get $local_mem_ptr))) (local.set $y (f32.load offset=4 (local.get $local_mem_ptr))) (global.set $global_mem_ptr (i32.add (i32.const 8) (global.get $global_mem_ptr))) (f32.store offset=4 (local.get $local_mem_ptr) (f32.const 1.5)) (f32.store offset=0 (local.get $local_mem_ptr) (f32.convert_i32_u (i32.const 2)))'
-    )
+    expect(fc('f', 'f()=({x};{x}=1.5)')).toMatchSnapshot()
+    expect(fc('f', 'f()=({x,y};{x,y}=(1.5,2))')).toMatchSnapshot()
+    expect(fc('f', 'f()=({x,y};{y,x}=(1.5,2))')).toMatchSnapshot()
+  })
+
+  describe('buffer', () => {
+    it('allocate', () => {
+      expect(fc('f', 'f()=(#:4,2)')).toMatchSnapshot()
+      expect(c('#:4,2')).toMatchSnapshot()
+      expect(c('#foo:4,2')).toMatchSnapshot()
+      expect(c('#:4')).toMatchSnapshot()
+      expect(fc('f', 'f()=(#:4;0.0)')).toMatchSnapshot()
+    })
+
+    it('read', () => {
+      expect(fc('f', 'f()=(#:4;#(2))')).toMatchSnapshot()
+    })
+
+    it('negative index read', () => {
+      expect(bodyOf('f()=(#:1;#=42;#(-1))')).toMatchSnapshot()
+    })
+
+    it('read tuple', () => {
+      expect(fc('f', 'f()=(#:4,2;(a,b)=#(2))')).toMatchSnapshot()
+      expect(fc('f', 'f()=(#:4,3;(a,b)=#(2))')).toMatchSnapshot()
+      expect(() => fc('f', 'f()=(#:4,2;(a,b,c)=#(2))')).toThrow('are greater')
+    })
+
+    it('write', () => {
+      expect(fc('f', 'f()=(#:4;#=2)')).toMatchSnapshot()
+    })
+
+    it('write tuple', () => {
+      expect(fc('f', 'f()=(#:4,2;#=(2,3))')).toMatchSnapshot()
+    })
+
+    it('map/call/reduce', () => {
+      expect(() => fc('f', 'add(a,b)=(a+b);f()=(#:4,2;#=(2,3);foo::add)')).toThrow('must be a buffer')
+      expect(fc('f', 'add(a,b)=(a+b);f()=(#:4,2;#=(2,3);#::add)')).toMatchSnapshot()
+    })
+
+    it('function with internal buffer', () => {
+      expect(bodyOf('v()=(#:2;y=#(0);#=1;y);f()=v()')).toMatchSnapshot()
+    })
+  })
+
+  describe('quirky cases', () => {
+    it('works', () => {
+      expect(bodyOf('a(.x)=x;f()=a()')).toMatchSnapshot()
+    })
+
+    it('negate then convert', () => {
+      expect(bodyOf('f()=(-1+1.0)')).toMatchSnapshot()
+    })
   })
 })

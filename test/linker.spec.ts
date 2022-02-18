@@ -1,0 +1,121 @@
+import * as libvm from '../src/lib/vm'
+import * as libwat from '../src/lib/wat'
+import { Linker } from '../src/linker'
+
+const memory = {
+  initial: 64,
+  maximum: 64,
+}
+
+let linker: Linker
+let floats: Float32Array
+
+const b = (s: string) => {
+  linker.link(s)
+  linker.make()
+  return linker.instance.exports as { [k: string]: (...args: number[]) => number } & libvm.VM
+}
+
+xdescribe('linker', () => {
+  beforeEach(() => {
+    linker = new Linker({
+      memory,
+      metrics: false,
+    })
+    floats = new Float32Array(linker.memory.buffer, 0, 5)
+  })
+
+  it('libwat', () => {
+    linker.linkLib(libwat)
+    expect(b('a(x,y)=sin(x%y+cos(y%4))').a(10, 2)).toEqual(-0.40341752767562866)
+    expect(b('a(x[1..2],y)=sin(x%y+cos(y%4))').a(10, 2)).toEqual(-0.40341752767562866)
+    expect(b('a(x[1..2]=1.5,y)=sin(x%y+cos(y%4))').a(10, 2)).toEqual(-0.40341752767562866)
+  })
+
+  it('vm', () => {
+    linker.linkLib({ env: libvm.env, ...libwat })
+
+    linker.linkSExpr(() => {
+      const params: string[] = linker.module.funcs.f.params.map(x => x.id.toString())
+      return [libvm.fill({ params })]
+    })
+
+    b('f(x)=x').fill(0, 3, 42)
+
+    expect([...floats]).toEqual([42, 42, 42, 0, 0])
+  })
+
+  it('lowpass', () => {
+    linker.linkLib({ env: libvm.env, ...libwat })
+
+    linker.linkSExpr(() => {
+      const params: string[] = linker.module.funcs.f.params.map(x => x.id.toString())
+      return [libvm.fill({ params })]
+    })
+
+    b(`
+      lp(x0, freq[1..1k]=100.0, Q[0.001..3]=1.0)=(
+        {x1,x2,y1,y2};
+
+        w = (pi2 * freq) / sr;
+        sin_w = sin(w);
+        cos_w = cos(w);
+        a = sin_w / (2.0 * Q);
+
+        b0 = (1.0 - cos_w) / 2.0;
+        b1 =  1.0 - cos_w;
+        b2 = b0;
+        a0 =  1.0 + a;
+        a1 = -2.0 * cos_w;
+        a2 =  1.0 - a;
+
+        g = 1.0 / a0;
+
+        (b0,b1,b2,a1,a2) *= g;
+
+        y0 = b0*x0 + b1*x1 + b2*x2 - a1*y1 - a2*y2;
+
+        {y1,y2} = (y0,y1);
+        {x1,x2} = (x0,x1);
+
+        y0
+      );
+
+      f(x)=lp(sin(t*x*pi2), 333.0, 2.5)
+    `).fill(0, 5, 666)
+
+    expect([...floats]).toMatchSnapshot()
+
+    const bq = { x1: 0, x2: 0, y1: 0, y2: 0 }
+
+    expect(
+      Array.from({ length: 5 })
+        .fill(0)
+        .map((_, i) => lp(bq, Math.sin((i / 44100) * 666 * Math.PI * 2), 333, 2.5))
+    ).toMatchSnapshot()
+  })
+})
+
+const pi2 = 6.2831854820251465
+const sampleRate = 44100
+
+const lp = (b, x0, freq = 1000, Q = 1) => {
+  const { y1, y2, x1, x2 } = b,
+    w0 = (pi2 * freq) / sampleRate,
+    sin_w0 = Math.sin(w0),
+    cos_w0 = Math.cos(w0),
+    alpha = sin_w0 / (2.0 * Q),
+    b0 = (1.0 - cos_w0) / 2.0,
+    b1 = 1.0 - cos_w0,
+    b2 = b0,
+    a0 = 1.0 + alpha,
+    a1 = -2.0 * cos_w0,
+    a2 = 1.0 - alpha,
+    y0 = (x0 * b0 + x1 * b1 + x2 * b2 - y1 * a1 - y2 * a2) / a0
+  b.y1 = y0
+  b.y2 = y1
+  b.x1 = x0
+  b.x2 = x1
+
+  return y0
+}

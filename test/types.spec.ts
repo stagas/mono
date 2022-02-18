@@ -1,0 +1,367 @@
+import { S } from '../src/sexpr'
+import { Type } from '../src/typed'
+import { VM } from '../src/vm'
+
+const run = (code: string) => {
+  const vm = new VM()
+  vm.skipMono = true
+  vm.setCode(code)
+  let a_type, a_source
+  if (vm.linker.module.funcs.a) {
+    a_type = vm.linker.module.typeOf(vm.linker.module.funcs.a.body.at(-1))
+    a_source = S(vm.linker.module.funcs.a.source)
+  }
+  return {
+    vm,
+    typeOf: vm.linker.module.typeOf,
+    funcs: vm.linker.module.funcs,
+    a_type,
+    a_source,
+    start_type: vm.linker.module.typeOf(vm.linker.module.funcs.__start__.body.at(-1)),
+    start_source: S(vm.linker.module.funcs.__start__.source),
+    f_type: vm.linker.module.typeOf(vm.linker.module.funcs.f.body.at(-1)),
+    f_source: S(vm.linker.module.funcs.f.source),
+    f: (...params: any) => {
+      // simulate start of loop
+      vm.exports.global_mem_ptr.value = 0
+      return vm.exports.f.call(this, ...params)
+    },
+  }
+}
+
+describe('Types', () => {
+  describe('const', () => {
+    it('f32', () => {
+      {
+        const m = run('f()=1.5')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.f32)
+        expect(m.f()).toBe(1.5)
+      }
+
+      {
+        const m = run('f()=-1.5')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.f32)
+        expect(m.f()).toBe(-1.5)
+      }
+    })
+
+    it('bool', () => {
+      {
+        const m = run('f()=0')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.bool)
+        expect(m.f()).toBe(0)
+      }
+      {
+        const m = run('f()=1')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.bool)
+        expect(m.f()).toBe(1)
+      }
+    })
+
+    it('i32', () => {
+      {
+        const m = run('f()=2')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.i32)
+        expect(m.f()).toBe(2)
+      }
+      {
+        const m = run('f()=-2')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.i32)
+        expect(m.f()).toBe(-2)
+      }
+    })
+  })
+
+  describe('calling function', () => {
+    it('i32', () => {
+      const m = run('a()=2;f()=a()')
+      expect(m.a_source).toMatchSnapshot()
+      expect(m.a_type).toBe(Type.i32)
+      expect(m.f_source).toMatchSnapshot()
+      expect(m.f_type).toBe(Type.i32)
+      expect(m.f()).toBe(2)
+    })
+
+    it('one level deep i32', () => {
+      const m = run('b()=2;a()=b();f()=a()')
+      expect(m.a_source).toMatchSnapshot()
+      expect(m.a_type).toBe(Type.i32)
+      expect(m.f_source).toMatchSnapshot()
+      expect(m.f_type).toBe(Type.i32)
+      expect(m.f()).toBe(2)
+    })
+
+    it('f32', () => {
+      const m = run('a()=1.5;f()=a()')
+      expect(m.a_source).toMatchSnapshot()
+      expect(m.a_type).toBe(Type.f32)
+      expect(m.f_source).toMatchSnapshot()
+      expect(m.f_type).toBe(Type.f32)
+      expect(m.f()).toBe(1.5)
+    })
+
+    it('one level deep f32', () => {
+      const m = run('b()=1.5;a()=b();f()=a()')
+      expect(m.a_source).toMatchSnapshot()
+      expect(m.a_type).toBe(Type.f32)
+      expect(m.f_source).toMatchSnapshot()
+      expect(m.f_type).toBe(Type.f32)
+      expect(m.f()).toBe(1.5)
+    })
+
+    it('switching i32 -> f32', () => {
+      const m = run('a()=2;f()=a()+0.5')
+      expect(m.a_source).toMatchSnapshot()
+      expect(m.a_type).toBe(Type.i32)
+      expect(m.f_source).toMatchSnapshot()
+      expect(m.f_type).toBe(Type.f32)
+      expect(m.f()).toBe(2.5)
+    })
+
+    it('switching f32 -> bool(i32)', () => {
+      const m = run('a()=2.5;f()=!a()')
+      expect(m.a_source).toMatchSnapshot()
+      expect(m.a_type).toBe(Type.f32)
+      expect(m.f_source).toMatchSnapshot()
+      expect(m.f_type).toBe(Type.bool)
+      expect(m.f()).toBe(0)
+    })
+
+    it('switching f32 -> bool(i32) -> i32', () => {
+      const m = run('b()=2.5;a()=!b();f()=a()+5')
+      expect(m.a_source).toMatchSnapshot()
+      expect(m.a_type).toBe(Type.bool)
+      expect(m.f_source).toMatchSnapshot()
+      expect(m.f_type).toBe(Type.i32)
+      expect(m.f()).toBe(5)
+    })
+  })
+
+  describe('arguments', () => {
+    it('f32', () => {
+      {
+        const m = run('f(x=1.0)=x')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.f32)
+        expect(m.f(1.5)).toBe(1.5)
+      }
+
+      {
+        const m = run('f(x=-1.0)=x')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.f32)
+        expect(m.f(1.5)).toBe(1.5)
+      }
+
+      {
+        const m = run('f(.x=-1.0)=x')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.f32)
+        expect(m.f(1.5)).toBe(1.5)
+      }
+    })
+
+    it('i32', () => {
+      {
+        const m = run('f(x=2)=x')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.i32)
+        expect(m.f(1.5)).toBe(1)
+      }
+
+      {
+        const m = run('f(x=-2)=x')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.i32)
+        expect(m.f(1.5)).toBe(1)
+      }
+
+      {
+        const m = run('f(.x=-2)=x')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.i32)
+        expect(m.f(1.5)).toBe(1)
+      }
+    })
+
+    it('bool', () => {
+      {
+        const m = run('f(x=1)=x')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.bool)
+        expect(m.f(1.5)).toBe(1)
+      }
+    })
+
+    it('exported bool', () => {
+      {
+        const m = run('f(.x=1)=x')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.bool)
+        expect(m.f(1.5)).toBe(1)
+      }
+    })
+
+    it('export no type use f32', () => {
+      {
+        const m = run('f(.x)=x')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.f32)
+        expect(m.f(1.5)).toBe(1.5)
+      }
+    })
+
+    it('infer f32', () => {
+      {
+        const m = run('f(x)=x')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.f32)
+        expect(m.f(1.5)).toBe(1.5)
+      }
+    })
+
+    it('from range f32', () => {
+      {
+        const m = run('f(x[1.0..2.0])=x')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.f32)
+        expect(m.f(1.5)).toBe(1.5)
+      }
+    })
+
+    it('from range i32', () => {
+      {
+        const m = run('f(x[1..2])=x')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.i32)
+        expect(m.f(1.5)).toBe(1)
+      }
+    })
+
+    it('exported from range i32', () => {
+      {
+        const m = run('f(.x[1..2])=x')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.i32)
+        expect(m.f(1.5)).toBe(1)
+      }
+    })
+
+    it('from range bool', () => {
+      {
+        const m = run('f(x[0..1])=x')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.bool)
+        expect(m.f(1.5)).toBe(1)
+      }
+    })
+
+    it('range i32..i32, default f32', () => {
+      {
+        const m = run('f(x[1..2]=3.0)=x')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.f32)
+        expect(m.funcs.f.params[0].range[0]).toMatchSnapshot()
+        expect(m.funcs.f.params[0].range[1]).toMatchSnapshot()
+        expect(m.f(1.5)).toBe(1.5)
+      }
+    })
+
+    it('range i32..f32, default f32 = f32', () => {
+      {
+        const m = run('f(x[1..2.0]=3.0)=x')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.f32)
+        expect(m.funcs.f.params[0].range[0]).toMatchSnapshot()
+        expect(m.funcs.f.params[0].range[1]).toMatchSnapshot()
+        expect(m.f(1.5)).toBe(1.5)
+      }
+    })
+
+    it('range f32..f32, default i32 = f32', () => {
+      {
+        const m = run('f(x[1.0..2.0]=3)=x')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.f32)
+        expect(m.funcs.f.params[0].range[0]).toMatchSnapshot()
+        expect(m.funcs.f.params[0].range[1]).toMatchSnapshot()
+        expect(m.funcs.f.params[0].default).toMatchSnapshot()
+        expect(m.f(1.5)).toBe(1.5)
+      }
+    })
+
+    it('range i32..i32, default i32 = i32', () => {
+      {
+        const m = run('f(x[2..5]=3)=x')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.i32)
+        expect(m.funcs.f.params[0].range[0]).toMatchSnapshot()
+        expect(m.funcs.f.params[0].range[1]).toMatchSnapshot()
+        expect(m.funcs.f.params[0].default).toMatchSnapshot()
+        expect(m.f(1.5)).toBe(1)
+      }
+    })
+
+    it('use default i32', () => {
+      {
+        const m = run('a(x=5)=x;f()=a()')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.i32)
+        expect(m.f()).toBe(5)
+      }
+    })
+
+    it('use default exported i32', () => {
+      {
+        const m = run('a(.x=5)=x;f()=a()')
+        expect(m.start_type).toMatchSnapshot()
+        expect(m.start_source).toMatchSnapshot()
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.i32)
+        expect(m.f()).toBe(5)
+      }
+    })
+
+    it('use default f32', () => {
+      {
+        const m = run('a(x=5.5)=x;f()=a()')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.f32)
+        expect(m.f()).toBe(5.5)
+      }
+    })
+
+    it('default to range i32', () => {
+      {
+        const m = run('a(x[1..5])=x;f()=a()')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.i32)
+        expect(m.f()).toBe(1)
+      }
+    })
+
+    it('default to range bool', () => {
+      {
+        const m = run('a(x[0..1])=x;f()=a()')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.bool)
+        expect(m.f()).toBe(0)
+      }
+    })
+
+    it('default to range f32', () => {
+      {
+        const m = run('a(x[0.5..1])=x;f()=a()')
+        expect(m.f_source).toMatchSnapshot()
+        expect(m.f_type).toBe(Type.f32)
+        expect(m.f()).toBe(0.5)
+      }
+    })
+  })
+})
