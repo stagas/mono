@@ -3,8 +3,9 @@
 import { join, modify } from './util'
 
 const ids = /[a-zA-Z_$][a-zA-Z0-9_$]*/
-const num = /inf|nan|\d[\d_]*(\.((e[+-]?)?[\d]+)+[kBb]*|(e[+-]?[\d]+)?[kBb]*)/
-const ops = /\+\+|--|\+=|-=|\*=|\/=|%=|<<=|>>=|&=|\^=|\|=|&&|!&|\|\||!=|==|>=|<=|>>|<<|\.\.|[{}\\"'`,\-~+*/%=<>?!:;.|&^@]{1}/
+const num = /inf|nan|\d*\.?\d*e[+-]?\d+|(\d*\.((e[+-]?)?[\d]+)*\d+|\.\d+|\d+)([skKBbf]|ms)?/
+const ops =
+  /%%|::|\?=|\+\+|--|\+=|-=|\*=|\/=|%=|<<=|>>=|&=|\^=|\|=|&&|!&|\|\||!=|==|>=|<=|>>|<<|\.\.|[[\](){}\\"'`,\-~+*/%=<>?!:;.|&^@]{1}/
 
 export const syntax = {
   // declare: [
@@ -41,9 +42,10 @@ export const syntax = {
 
   comment: join('|', /(\/\*)[^]*?(\*\/)/, /(\s?(\/\/)[\S\s]*?(?=[\n\r]))/, /(\/\*)[^]*/),
   property: join('', ids, /(?=\()/),
+  declare: join('', /#/, ids),
+  regexp: /\b(t|pi2?|sr|br|mr)\b/,
   normal: ids,
-  declare: /t|pi2?/,
-  number: num,
   punctuation: /[[\](),]/,
+  number: num,
   operator: ops,
 } //as SyntaxDefinition

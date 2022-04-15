@@ -1,14 +1,21 @@
 {
   "extends": "./tsconfig.json",
+  "include": [
+    "src"
+  ],
   "exclude": [
-    "bench",
+    "dist",
     "example",
+    "node_modules",
     "test",
-    "**/*.spec.ts",
-    "**/*.spec.tsx"
+    "types"
   ],
   "compilerOptions": {
     "jsx": "react-jsx",
-    "jsxImportSource": "base-custom-element"
+    "types": [
+      "./types/globals",
+      "./types/modules",
+      "node"
+    ]
   }
 }

@@ -1,8 +1,8 @@
 import { VM } from '../../src/vm'
 
-const b = (s: string) => {
+const b = async (s: string) => {
   const vm = new VM()
-  vm.setCode(s)
+  await vm.setCode(s)
   floats = new Float32Array(vm.linker.memory.buffer, 0, 5)
   return vm.exports
 }
@@ -10,8 +10,8 @@ const b = (s: string) => {
 let floats: Float32Array
 
 describe('mono', () => {
-  it('lp', () => {
-    b('f(x)=lp(sin(t*x*pi2), 333.0, 2.5)').fill(0, 5, 666)
+  it('lp', async () => {
+    ;(await b('f(x)=lp(sin(t*x*pi2), 333.0, 2.5)')).fill(0, 5, 666)
 
     expect([...floats]).toMatchSnapshot()
 
@@ -27,7 +27,7 @@ describe('mono', () => {
 const pi2 = 6.2831854820251465
 const sampleRate = 44100
 
-const lp = (b, x0, freq = 1000, Q = 1) => {
+const lp = (b: any, x0: any, freq = 1000, Q = 1) => {
   const { y1, y2, x1, x2 } = b,
     w0 = (pi2 * freq) / sampleRate,
     sin_w0 = Math.sin(w0),

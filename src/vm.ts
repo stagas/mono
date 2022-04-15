@@ -107,9 +107,9 @@ export class VM {
     return this.funcs.f.params //.map(argToMonoParam)
   }
 
-  setCode(code: string) {
+  async setCode(code: string) {
     this.linker.link(code)
-    this.linker.make()
+    await this.linker.make()
     this.isReady = true
     this.config.metrics && console.log('mono: ready')
   }

@@ -8,11 +8,14 @@
     "files": true
   },
   "include": [
-    "bench",
     "example",
     "src",
     "test",
     "types"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
   ],
   "compilerOptions": {
     "outDir": "dist/cjs",
@@ -21,15 +24,20 @@
       "DOM.Iterable",
       "ESNext"
     ],
+    "emitDeclarationOnly": true,
     "moduleResolution": "node",
+    "useDefineForClassFields": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "inlineSources": true,
     "declaration": true,
+    "skipDefaultLibCheck": true,
+    "skipLibCheck": true,
     "sourceMap": true,
     "allowJs": true,
+    "incremental": true,
     "module": "commonjs",
     "target": "esnext",
     "jsx": "preserve",

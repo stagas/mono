@@ -10,12 +10,12 @@ export const parse: (input: string) => Node & {
     [
       /(?<ids>[#a-zA-Z_$][a-zA-Z0-9_$]*)/,
       // TODO: support .5 .3 ...
-      // TODO: support 1k(1024) 2k 1K(1000) ...
+      // TODO: support 1k(1000) 2k 1K(1024) ...
       // TODO: support 1s .5s 100ms ...
       // TODO: support 1b(beat) 1B(bar)
-      /(?<num>inf|nan|\d[\d_]*(\.((e[+-]?)?[\d]+)+[kBb]*|(e[+-]?[\d]+)?[kBb]*))/,
+      /(?<num>inf|nan|\.\.|\d*\.?\d*e[+-]?\d+|(\d*\.((e[+-]?)?[\d]+)*\d+|\.\d+|\d+)([skKBbf]|ms)?)/,
       /(?<nul>\s+|\/\/.*|\/\*[^]*?\*\/)/,
-      /(?<ops>%%|::|\+\+|--|\+=|-=|\*=|\/=|%=|<<=|>>=|&=|\^=|\|=|&&|!&|\|\||!=|==|>=|<=|>>|<<|\.\.|[[\](){}\\"'`,\-~+*/%=<>?!:;.|&^@]{1})/,
+      /(?<ops>%%|::|\?=|\+\+|--|\+=|-=|\*=|\/=|%=|<<=|>>=|&=|\^=|\|=|&&|!&|\|\||!=|==|>=|<=|>>|<<|\.\.|[[\](){}\\"'`,\-~+*/%=<>?!:;.|&^@]{1})/,
       /(?<err>.)/,
     ],
     'g'
@@ -40,11 +40,34 @@ export const parse: (input: string) => Node & {
         }
       }
 
+    const parseNumber = (t: Token) => {
+      const isFloat = t.includes('.') || t.at(-1) == 'f'
+      let parsed = parseFloat(t).toString()
+      if (isFloat && !parsed.includes('.')) parsed += '.0'
+      const number = t.as(parsed)
+      const lastTwo = t.slice(-2)
+      const lastOne = t.at(-1)
+      if (lastTwo === 'ms') {
+        return [t.as('*', 'ops'), [t.as('*', 'ops'), number, t.as('sr', 'ids')], t.as('0.001')]
+      } else if (lastOne === 's') {
+        return [t.as('*', 'ops'), number, t.as('sr', 'ids')]
+      } else if (lastOne === 'k') {
+        return [t.as('*', 'ops'), number, t.as('1000')]
+      } else if (lastOne === 'K') {
+        return [t.as('*', 'ops'), number, t.as('1024')]
+      } else if (lastOne === 'b') {
+        return [t.as('*', 'ops'), number, t.as('br', 'ids')]
+      } else if (lastOne === 'B') {
+        return [t.as('*', 'ops'), [t.as('*', 'ops'), number, t.as('br', 'ids')], t.as('mr', 'ids')]
+      }
+      return number
+    }
+
     return {
       ops: [[], never],
       eof: [[], never],
       ids: [[], pass],
-      num: [[], pass],
+      num: [[], { nud: t => parseNumber(t), led: (t, _, x) => [x, parseNumber(t)] }],
 
       ';': [[1, 1], { led: bin }],
 
@@ -66,6 +89,7 @@ export const parse: (input: string) => Node & {
       '|=': [[3, 2], { led: varbin('|') }],
 
       '?': [[4, 2], { led: until(':', 3, (t, L, M, r) => [t, L, M, expr(r)]) }],
+      // '?=': [[4, 2], { led: until(':', 3, (t, L, M, r) => [t, L, M, expr(r)]) }],
 
       '||': [[5, 4], { led: bin }],
 

@@ -6,7 +6,7 @@ describe('parse', () => {
     expect('' + parse('3*4+5*6')).toEqual('(+ (* 3 4) (* 5 6))')
     expect('' + parse('3*(4+5)*6')).toEqual('(* (* 3 (+ 4 5)) 6)')
     expect('' + parse('1..2')).toEqual('(.. 1 2)')
-    expect('' + parse('1k..10k')).toEqual('(.. 1k 10k)')
+    expect('' + parse('1k..10k')).toEqual('(.. (* 1 1000) (* 10 1000))')
     expect('' + parse('1..2+5')).toEqual('(.. 1 (+ 2 5))')
     expect('' + parse('1+2..2+5')).toEqual('(.. (+ 1 2) (+ 2 5))')
     expect('' + parse('1;2')).toEqual('(; 1 2)')
@@ -24,7 +24,7 @@ describe('parse', () => {
     expect('' + parse('a(1 + 2, b(3))')).toEqual('(@ a (, (+ 1 2) (@ b 3)))')
     expect('' + parse('a(1 + 2, b(3), c[1])')).toEqual('(@ a (, (, (+ 1 2) (@ b 3)) ([ c 1)))')
     expect('' + parse('!1')).toEqual('(! 1)')
-    expect('' + parse('.1')).toEqual('(. 1)')
+    expect('' + parse('.1')).toEqual('0.1')
     expect('' + parse('!!1')).toEqual('(! (! 1))')
     expect('' + parse('!!1*2')).toEqual('(* (! (! 1)) 2)')
     expect(() => parse('1+')).toThrow('bad op')
@@ -153,6 +153,47 @@ describe('parse', () => {
 
     it('multi variable', () => {
       expect('' + parse('(a,b)=(1,2)')).toEqual('(= (, a b) (, 1 2))')
+    })
+  })
+
+  describe('numbers', () => {
+    it('floats with leading . dot', () => {
+      expect('' + parse('.1')).toEqual('0.1')
+      expect('' + parse('.1e2')).toEqual('10.0')
+      expect('' + parse('.1e-2')).toEqual('0.001')
+      expect('' + parse('.1e+2')).toEqual('10.0')
+      expect('' + parse('.0')).toEqual('0.0')
+      expect('' + parse('.01')).toEqual('0.01')
+    })
+
+    it('floats with trailing f', () => {
+      expect('' + parse('1f')).toEqual('1.0')
+      expect('' + parse('10f')).toEqual('10.0')
+    })
+
+    it('floats with trailing dot .', () => {
+      expect('' + parse('1.0')).toEqual('1.0')
+      expect('' + parse('1.e2')).toEqual('100.0')
+      expect('' + parse('1.e-2')).toEqual('0.01')
+      expect('' + parse('1.e+2')).toEqual('100.0')
+      expect('' + parse('0.0')).toEqual('0.0')
+      expect('' + parse('01.0')).toEqual('1.0')
+    })
+
+    it('seconds', () => {
+      expect('' + parse('1s')).toEqual('(* 1 sr)')
+      expect('' + parse('.5s')).toEqual('(* 0.5 sr)')
+      expect('' + parse('1ms')).toEqual('(* (* 1 sr) 0.001)')
+    })
+
+    it('kK', () => {
+      expect('' + parse('1k')).toEqual('(* 1 1000)')
+      expect('' + parse('1K')).toEqual('(* 1 1024)')
+    })
+
+    it('beat/bar', () => {
+      expect('' + parse('1b')).toEqual('(* 1 br)')
+      expect('' + parse('1B')).toEqual('(* (* 1 br) mr)')
     })
   })
 })
