@@ -97,7 +97,7 @@ export const parse: (input: string) => Node & {
 
       '|': [[7, 6], { led: bin }],
 
-      // '^': [[7, 6], { led: bin }],
+      '^': [[7, 6], { led: bin }],
 
       '&': [[9, 8], { led: bin }],
 
@@ -124,7 +124,7 @@ export const parse: (input: string) => Node & {
       '~': [[15, 2], { led: pre, nud: post(15) }],
       // '#': [[15, 2], { led: pre, nud: post(15) }],
       '.': [[15, 2], { led: pre, nud: post(15) }],
-      '^': [[15, 15], { led: bin }],
+      '**': [[15, 15], { led: bin }],
 
       '++': [
         [16, 2],

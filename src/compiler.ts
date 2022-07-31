@@ -598,8 +598,9 @@ export const compile = (node: Node, scope: Scope = {}, includes: Includes = {}, 
     '|': typebin(Type.i32, 'or'),
 
     // x^y : bitwise XOR
-    // '^': typebin(Type.i32, 'xor'),
-    '^': (lhs, rhs) => typeAs(Type.f32, ['call', '$pow', ...castAll(Type.f32, lhs, rhs)]),
+    '^': typebin(Type.i32, 'xor'),
+
+    '**': (lhs, rhs) => typeAs(Type.f32, ['call', '$pow', ...castAll(Type.f32, lhs, rhs)]),
 
     // x&y : bitwise AND
     '&': typebin(Type.i32, 'and'),
