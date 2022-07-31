@@ -1,5 +1,5 @@
-export * from './parser'
 export * from './compiler'
 export * from './linker'
-export * from './vm'
+export * from './parser'
 export * from './syntax'
+export * from './vm'

@@ -1,6 +1,7 @@
+import { cheapRandomId } from 'everyday-utils'
 import rfdc from 'rfdc'
 import * as wat from 'wat-compiler'
-import { CompStep, Includes, Module, Scope, Type, compile } from './compiler'
+import { compile, CompStep, Includes, Module, Scope, Type } from './compiler'
 import { parse } from './parser'
 import { S, SExpr } from './sexpr'
 
@@ -14,6 +15,8 @@ export interface LinkerConfig {
 }
 
 export class Linker {
+  id = cheapRandomId()
+
   // mono
   config: LinkerConfig
   module?: Module
@@ -32,42 +35,48 @@ export class Linker {
   }
 
   async make() {
-    this.config.metrics && console.time('mono: make')
+    //!time `[${this.id}] make`
+
+    //!? `[${this.id}] binary size: %d bytes`, this.binary.length
+
     this.instance = (await WebAssembly.instantiate(this.binary!, { env: { memory: this.memory } })).instance
+
     // const wasmModule = new WebAssembly.Module(this.binary!)
     // this.instance = new WebAssembly.Instance(wasmModule, { env: { memory: this.memory } })
-    this.config.metrics && console.timeEnd('mono: make')
+
+    //!timeEnd `[${this.id}] make`
+    return
   }
 
   link(src: string) {
-    this.config.metrics && console.time('mono: link')
+    //!time `[${this.id}] link`
 
     if (!this.lib) this.linkLib({})
     const lib = this.lib!
 
-    this.config.metrics === VERBOSE && console.time('mono: parse')
-    const ast = parse([src].join(';').replace(/;{1,}/g, ';'))
-    this.config.metrics === VERBOSE && console.timeEnd('mono: parse')
+    //!time `[${this.id}] parse`
+    const ast = parse(src)
+    //!timeEnd `[${this.id}] parse`
 
-    this.config.metrics === VERBOSE && console.time('mono: compile')
+    //!time `[${this.id}] compile`
     this.module = compile(ast, copy(lib.scope), lib.includes, CompStep.User)
-    this.config.metrics === VERBOSE && console.timeEnd('mono: compile')
+    //!timeEnd `[${this.id}] compile`
 
-    // console.log(this.module)
-
-    // return
-    this.config.metrics === VERBOSE && console.time('mono: wat binary')
+    //!time `[${this.id}] binary`
     const sexpr = ['module', ...this.sexpr(this), ...this.module.body]
+
     // debugger
     // console.log(S(sexpr))
-    this.binary = wat.default(S(sexpr), this.config as wat.Options, copy(lib.context))
-    this.config.metrics === VERBOSE && console.timeEnd('mono: wat binary')
 
-    this.config.metrics && console.timeEnd('mono: link')
+    this.binary = wat.default(S(sexpr), this.config as wat.Options, copy(lib.context))
+    //!timeEnd `[${this.id}] binary`
+
+    //!timeEnd `[${this.id}] link`
+    return
   }
 
   linkLib(lib: Record<string, string | ((config: LinkerConfig) => string)>) {
-    this.config.metrics && console.time('mono: lib')
+    //!time `[${this.id}] lib`
 
     const includes: Includes = {}
 
@@ -86,7 +95,8 @@ export class Linker {
 
     this.lib = { context, scope, includes }
 
-    this.config.metrics && console.timeEnd('mono: lib')
+    //!timeEnd `[${this.id}] lib`
+    return
   }
 
   linkSExpr(fn: (linker: Linker) => SExpr) {
@@ -99,21 +109,23 @@ export class Linker {
     if (!this.lib) this.linkLib({})
     const lib = this.lib!
 
-    this.config.metrics === VERBOSE && console.time('mono: lib mono: parse')
+    //!time `[${this.id}] lib mono parse`
     const ast = parse([...Object.values(this.mono)].join(';').replace(/;{1,}/g, ';'))
-    this.config.metrics === VERBOSE && console.timeEnd('mono: lib mono: parse')
+    //!timeEnd `[${this.id}] lib mono parse`
 
-    this.config.metrics === VERBOSE && console.time('mono: lib mono: compile')
+    //!time `[${this.id}] lib mono compile`
     const module = compile(ast, lib.scope, lib.includes, CompStep.Lib)
     lib.includes = Object.assign(
       lib.includes,
       Object.fromEntries(Object.entries(module.funcs).filter(([name]) => !(name in lib.includes)))
     )
-    this.config.metrics === VERBOSE && console.timeEnd('mono: lib mono: compile')
+    //!timeEnd `[${this.id}] lib mono compile`
 
-    this.config.metrics === VERBOSE && console.time('mono: lib mono: wat binary')
+    //!time `[${this.id}] lib mono binary`
     const sexpr = ['module', ...module.body]
     wat.default(S(sexpr), this.config as wat.Options, lib.context)
-    this.config.metrics === VERBOSE && console.timeEnd('mono: lib mono: wat binary')
+    //!timeEnd `[${this.id}] lib mono binary`
+
+    return
   }
 }
