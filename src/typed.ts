@@ -9,6 +9,14 @@ export enum Type {
   f32 = 'f32',
 }
 
+const I32Suffixed = `
+  load8 load16
+  lt gt le ge
+  div rem shr
+  trunc_f32 trunc_f64 extend_i32
+  convert_i32 convert_i64
+`.split(/\s+/)
+
 export const Types: Type[] = [Type.any, Type.bool, Type.i32, Type.f32]
 
 export const W = (x: Type) => Types.indexOf(x)
@@ -70,7 +78,13 @@ export const Typed = () => {
   const top = (type: Type, ops: SExpr): SExpr => {
     const prefix = type == Type.f32 ? 'f32' : 'i32'
     const [op, ...values] = ops
-    return typeAs(type, [prefix + '.' + op, ...castAll(type, ...values)])
+
+    // add suffix to specific i32 operations
+    // TODO: cleaner way to do this
+    let suffix = ''
+    if (type === 'i32' && I32Suffixed.includes('' + op)) suffix = '_s'
+
+    return typeAs(type, [prefix + '.' + op + suffix, ...castAll(type, ...values)])
   }
 
   /** infers the type of a token literal string: bool for 0 or 1, i32 for integers and f32 for floats */

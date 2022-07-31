@@ -893,7 +893,7 @@ export const compile = (node: Node, scope: Scope = {}, includes: Includes = {}, 
           funcs.__start__.body!.push(['global.set', '$' + export_id,
             [t + '.add',
               ['global.get', '$' + export_id + '/min'],
-              [t + '.div' + (t === 'i32' ? '_u' : ''),
+              [t + '.div' + (t === 'i32' ? '_u' : ''), // TODO: _u or _s ??
                 [t + '.sub',
                   ['global.get', '$' + export_id + '/max'],
                   ['global.get', '$' + export_id + '/min']
