@@ -1,59 +1,155 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`Types arguments bool 1`] = `
-"(func $f 
-  (export \\"f\\") 
-  (param $x i32) 
-  (result i32) 
-  (local.get $x))"
-`;
-
-exports[`Types arguments default to range bool 1`] = `
-"(func $f 
-  (export \\"f\\") 
-  (result i32) 
-  (call $a 
-    (i32.const 0)))"
-`;
-
-exports[`Types arguments default to range f32 1`] = `
+exports[`Types const f32 1`] = `
 "(func $f 
   (export \\"f\\") 
   (result f32) 
-  (call $a 
+  (f32.const 1.5))"
+`;
+
+exports[`Types const f32 2`] = `
+"(func $f 
+  (export \\"f\\") 
+  (result f32) 
+  (f32.mul 
+    (f32.const -1) 
+    (f32.const 1.5)))"
+`;
+
+exports[`Types const bool 1`] = `
+"(func $f 
+  (export \\"f\\") 
+  (result i32) 
+  (i32.const 0))"
+`;
+
+exports[`Types const bool 2`] = `
+"(func $f 
+  (export \\"f\\") 
+  (result i32) 
+  (i32.const 1))"
+`;
+
+exports[`Types const i32 1`] = `
+"(func $f 
+  (export \\"f\\") 
+  (result i32) 
+  (i32.const 2))"
+`;
+
+exports[`Types const i32 2`] = `
+"(func $f 
+  (export \\"f\\") 
+  (result i32) 
+  (i32.mul 
+    (i32.const -1) 
+    (i32.const 2)))"
+`;
+
+exports[`Types calling function i32 1`] = `
+"(func $a 
+  (export \\"a\\") 
+  (result i32) 
+  (i32.const 2))"
+`;
+
+exports[`Types calling function i32 2`] = `
+"(func $f 
+  (export \\"f\\") 
+  (result i32) 
+  (call $a))"
+`;
+
+exports[`Types calling function one level deep i32 1`] = `
+"(func $a 
+  (export \\"a\\") 
+  (result i32) 
+  (call $b))"
+`;
+
+exports[`Types calling function one level deep i32 2`] = `
+"(func $f 
+  (export \\"f\\") 
+  (result i32) 
+  (call $a))"
+`;
+
+exports[`Types calling function f32 1`] = `
+"(func $a 
+  (export \\"a\\") 
+  (result f32) 
+  (f32.const 1.5))"
+`;
+
+exports[`Types calling function f32 2`] = `
+"(func $f 
+  (export \\"f\\") 
+  (result f32) 
+  (call $a))"
+`;
+
+exports[`Types calling function one level deep f32 1`] = `
+"(func $a 
+  (export \\"a\\") 
+  (result f32) 
+  (call $b))"
+`;
+
+exports[`Types calling function one level deep f32 2`] = `
+"(func $f 
+  (export \\"f\\") 
+  (result f32) 
+  (call $a))"
+`;
+
+exports[`Types calling function switching i32 -> f32 1`] = `
+"(func $a 
+  (export \\"a\\") 
+  (result i32) 
+  (i32.const 2))"
+`;
+
+exports[`Types calling function switching i32 -> f32 2`] = `
+"(func $f 
+  (export \\"f\\") 
+  (result f32) 
+  (f32.add 
+    (f32.convert_i32_s 
+      (call $a)) 
     (f32.const 0.5)))"
 `;
 
-exports[`Types arguments default to range i32 1`] = `
-"(func $f 
-  (export \\"f\\") 
-  (result i32) 
-  (call $a 
-    (i32.const 1)))"
-`;
-
-exports[`Types arguments export no type use f32 1`] = `
-"(func $f 
-  (export \\"f\\") 
-  (param $x f32) 
+exports[`Types calling function switching f32 -> bool(i32) 1`] = `
+"(func $a 
+  (export \\"a\\") 
   (result f32) 
-  (local.get $x))"
+  (f32.const 2.5))"
 `;
 
-exports[`Types arguments exported bool 1`] = `
+exports[`Types calling function switching f32 -> bool(i32) 2`] = `
 "(func $f 
   (export \\"f\\") 
-  (param $x i32) 
   (result i32) 
-  (local.get $x))"
+  (i32.eqz 
+    (i32.trunc_f32_u 
+      (call $a))))"
 `;
 
-exports[`Types arguments exported from range i32 1`] = `
+exports[`Types calling function switching f32 -> bool(i32) -> i32 1`] = `
+"(func $a 
+  (export \\"a\\") 
+  (result i32) 
+  (i32.eqz 
+    (i32.trunc_f32_u 
+      (call $b))))"
+`;
+
+exports[`Types calling function switching f32 -> bool(i32) -> i32 2`] = `
 "(func $f 
   (export \\"f\\") 
-  (param $x i32) 
   (result i32) 
-  (local.get $x))"
+  (i32.add 
+    (call $a) 
+    (i32.const 5)))"
 `;
 
 exports[`Types arguments f32 1`] = `
@@ -77,30 +173,6 @@ exports[`Types arguments f32 3`] = `
   (export \\"f\\") 
   (param $x f32) 
   (result f32) 
-  (local.get $x))"
-`;
-
-exports[`Types arguments from range bool 1`] = `
-"(func $f 
-  (export \\"f\\") 
-  (param $x i32) 
-  (result i32) 
-  (local.get $x))"
-`;
-
-exports[`Types arguments from range f32 1`] = `
-"(func $f 
-  (export \\"f\\") 
-  (param $x f32) 
-  (result f32) 
-  (local.get $x))"
-`;
-
-exports[`Types arguments from range i32 1`] = `
-"(func $f 
-  (export \\"f\\") 
-  (param $x i32) 
-  (result i32) 
   (local.get $x))"
 `;
 
@@ -128,12 +200,135 @@ exports[`Types arguments i32 3`] = `
   (local.get $x))"
 `;
 
+exports[`Types arguments bool 1`] = `
+"(func $f 
+  (export \\"f\\") 
+  (param $x i32) 
+  (result i32) 
+  (local.get $x))"
+`;
+
+exports[`Types arguments exported bool 1`] = `
+"(func $f 
+  (export \\"f\\") 
+  (param $x i32) 
+  (result i32) 
+  (local.get $x))"
+`;
+
+exports[`Types arguments export no type use f32 1`] = `
+"(func $f 
+  (export \\"f\\") 
+  (param $x f32) 
+  (result f32) 
+  (local.get $x))"
+`;
+
 exports[`Types arguments infer f32 1`] = `
 "(func $f 
   (export \\"f\\") 
   (param $x f32) 
   (result f32) 
   (local.get $x))"
+`;
+
+exports[`Types arguments from range f32 1`] = `
+"(func $f 
+  (export \\"f\\") 
+  (param $x f32) 
+  (result f32) 
+  (local.get $x))"
+`;
+
+exports[`Types arguments from range i32 1`] = `
+"(func $f 
+  (export \\"f\\") 
+  (param $x i32) 
+  (result i32) 
+  (local.get $x))"
+`;
+
+exports[`Types arguments exported from range i32 1`] = `
+"(func $f 
+  (export \\"f\\") 
+  (param $x i32) 
+  (result i32) 
+  (local.get $x))"
+`;
+
+exports[`Types arguments from range bool 1`] = `
+"(func $f 
+  (export \\"f\\") 
+  (param $x i32) 
+  (result i32) 
+  (local.get $x))"
+`;
+
+exports[`Types arguments range i32..i32, default f32 1`] = `
+"(func $f 
+  (export \\"f\\") 
+  (param $x f32) 
+  (result f32) 
+  (local.get $x))"
+`;
+
+exports[`Types arguments range i32..i32, default f32 2`] = `
+Array [
+  "f32.convert_i32_s",
+  Array [
+    "i32.const",
+    Token {
+      "0": "1",
+      "group": "num",
+    },
+  ],
+]
+`;
+
+exports[`Types arguments range i32..i32, default f32 3`] = `
+Array [
+  "f32.convert_i32_s",
+  Array [
+    "i32.const",
+    Token {
+      "0": "2",
+      "group": "num",
+    },
+  ],
+]
+`;
+
+exports[`Types arguments range i32..f32, default f32 = f32 1`] = `
+"(func $f 
+  (export \\"f\\") 
+  (param $x f32) 
+  (result f32) 
+  (local.get $x))"
+`;
+
+exports[`Types arguments range i32..f32, default f32 = f32 2`] = `
+Array [
+  "f32.convert_i32_u",
+  Array [
+    "i32.const",
+    Token {
+      "0": "1",
+      "group": "num",
+    },
+  ],
+]
+`;
+
+exports[`Types arguments range i32..f32, default f32 = f32 3`] = `
+Array [
+  "f32.const",
+  Token {
+    "0": "2",
+    "1": ".",
+    "2": "0",
+    "group": "num",
+  },
+]
 `;
 
 exports[`Types arguments range f32..f32, default i32 = f32 1`] = `
@@ -181,73 +376,6 @@ Array [
 ]
 `;
 
-exports[`Types arguments range i32..f32, default f32 = f32 1`] = `
-"(func $f 
-  (export \\"f\\") 
-  (param $x f32) 
-  (result f32) 
-  (local.get $x))"
-`;
-
-exports[`Types arguments range i32..f32, default f32 = f32 2`] = `
-Array [
-  "f32.convert_i32_u",
-  Array [
-    "i32.const",
-    Token {
-      "0": "1",
-      "group": "num",
-    },
-  ],
-]
-`;
-
-exports[`Types arguments range i32..f32, default f32 = f32 3`] = `
-Array [
-  "f32.const",
-  Token {
-    "0": "2",
-    "1": ".",
-    "2": "0",
-    "group": "num",
-  },
-]
-`;
-
-exports[`Types arguments range i32..i32, default f32 1`] = `
-"(func $f 
-  (export \\"f\\") 
-  (param $x f32) 
-  (result f32) 
-  (local.get $x))"
-`;
-
-exports[`Types arguments range i32..i32, default f32 2`] = `
-Array [
-  "f32.convert_i32_s",
-  Array [
-    "i32.const",
-    Token {
-      "0": "1",
-      "group": "num",
-    },
-  ],
-]
-`;
-
-exports[`Types arguments range i32..i32, default f32 3`] = `
-Array [
-  "f32.convert_i32_s",
-  Array [
-    "i32.const",
-    Token {
-      "0": "2",
-      "group": "num",
-    },
-  ],
-]
-`;
-
 exports[`Types arguments range i32..i32, default i32 = i32 1`] = `
 "(func $f 
   (export \\"f\\") 
@@ -286,6 +414,14 @@ Array [
 ]
 `;
 
+exports[`Types arguments use default i32 1`] = `
+"(func $f 
+  (export \\"f\\") 
+  (result i32) 
+  (call $a 
+    (i32.const 5)))"
+`;
+
 exports[`Types arguments use default exported i32 1`] = `"any"`;
 
 exports[`Types arguments use default exported i32 2`] = `
@@ -312,163 +448,26 @@ exports[`Types arguments use default f32 1`] = `
     (f32.const 5.5)))"
 `;
 
-exports[`Types arguments use default i32 1`] = `
+exports[`Types arguments default to range i32 1`] = `
 "(func $f 
   (export \\"f\\") 
   (result i32) 
   (call $a 
-    (i32.const 5)))"
+    (i32.const 1)))"
 `;
 
-exports[`Types calling function f32 1`] = `
-"(func $a 
-  (export \\"a\\") 
-  (result f32) 
-  (f32.const 1.5))"
+exports[`Types arguments default to range bool 1`] = `
+"(func $f 
+  (export \\"f\\") 
+  (result i32) 
+  (call $a 
+    (i32.const 0)))"
 `;
 
-exports[`Types calling function f32 2`] = `
+exports[`Types arguments default to range f32 1`] = `
 "(func $f 
   (export \\"f\\") 
   (result f32) 
-  (call $a))"
-`;
-
-exports[`Types calling function i32 1`] = `
-"(func $a 
-  (export \\"a\\") 
-  (result i32) 
-  (i32.const 2))"
-`;
-
-exports[`Types calling function i32 2`] = `
-"(func $f 
-  (export \\"f\\") 
-  (result i32) 
-  (call $a))"
-`;
-
-exports[`Types calling function one level deep f32 1`] = `
-"(func $a 
-  (export \\"a\\") 
-  (result f32) 
-  (call $b))"
-`;
-
-exports[`Types calling function one level deep f32 2`] = `
-"(func $f 
-  (export \\"f\\") 
-  (result f32) 
-  (call $a))"
-`;
-
-exports[`Types calling function one level deep i32 1`] = `
-"(func $a 
-  (export \\"a\\") 
-  (result i32) 
-  (call $b))"
-`;
-
-exports[`Types calling function one level deep i32 2`] = `
-"(func $f 
-  (export \\"f\\") 
-  (result i32) 
-  (call $a))"
-`;
-
-exports[`Types calling function switching f32 -> bool(i32) -> i32 1`] = `
-"(func $a 
-  (export \\"a\\") 
-  (result i32) 
-  (i32.eqz 
-    (i32.trunc_f32_u 
-      (call $b))))"
-`;
-
-exports[`Types calling function switching f32 -> bool(i32) -> i32 2`] = `
-"(func $f 
-  (export \\"f\\") 
-  (result i32) 
-  (i32.add 
-    (call $a) 
-    (i32.const 5)))"
-`;
-
-exports[`Types calling function switching f32 -> bool(i32) 1`] = `
-"(func $a 
-  (export \\"a\\") 
-  (result f32) 
-  (f32.const 2.5))"
-`;
-
-exports[`Types calling function switching f32 -> bool(i32) 2`] = `
-"(func $f 
-  (export \\"f\\") 
-  (result i32) 
-  (i32.eqz 
-    (i32.trunc_f32_u 
-      (call $a))))"
-`;
-
-exports[`Types calling function switching i32 -> f32 1`] = `
-"(func $a 
-  (export \\"a\\") 
-  (result i32) 
-  (i32.const 2))"
-`;
-
-exports[`Types calling function switching i32 -> f32 2`] = `
-"(func $f 
-  (export \\"f\\") 
-  (result f32) 
-  (f32.add 
-    (f32.convert_i32_s 
-      (call $a)) 
+  (call $a 
     (f32.const 0.5)))"
-`;
-
-exports[`Types const bool 1`] = `
-"(func $f 
-  (export \\"f\\") 
-  (result i32) 
-  (i32.const 0))"
-`;
-
-exports[`Types const bool 2`] = `
-"(func $f 
-  (export \\"f\\") 
-  (result i32) 
-  (i32.const 1))"
-`;
-
-exports[`Types const f32 1`] = `
-"(func $f 
-  (export \\"f\\") 
-  (result f32) 
-  (f32.const 1.5))"
-`;
-
-exports[`Types const f32 2`] = `
-"(func $f 
-  (export \\"f\\") 
-  (result f32) 
-  (f32.mul 
-    (f32.const -1) 
-    (f32.const 1.5)))"
-`;
-
-exports[`Types const i32 1`] = `
-"(func $f 
-  (export \\"f\\") 
-  (result i32) 
-  (i32.const 2))"
-`;
-
-exports[`Types const i32 2`] = `
-"(func $f 
-  (export \\"f\\") 
-  (result i32) 
-  (i32.mul 
-    (i32.const -1) 
-    (i32.const 2)))"
 `;

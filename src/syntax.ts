@@ -1,6 +1,6 @@
 // import { SyntaxDefinition } from 'code-syntax'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { join, modify } from './util'
+import { join } from './util'
 
 const ids = /[a-zA-Z_$][a-zA-Z0-9_$]*/
 const num = /inf|nan|\d*\.?\d*e[+-]?\d+|(\d*\.((e[+-]?)?[\d]+)*\d+|\.\d+|\d+)([skKmbf]|ms)?/

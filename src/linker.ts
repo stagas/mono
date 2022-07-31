@@ -7,7 +7,7 @@ import { S, SExpr } from './sexpr'
 
 const copy = rfdc({ proto: true, circles: false })
 
-const VERBOSE = 2
+// const VERBOSE = 2
 
 export interface LinkerConfig {
   memory: WebAssembly.MemoryDescriptor

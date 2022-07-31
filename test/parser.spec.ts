@@ -27,7 +27,7 @@ describe('parse', () => {
     expect('' + parse('.1')).toEqual('0.1')
     expect('' + parse('!!1')).toEqual('(! (! 1))')
     expect('' + parse('!!1*2')).toEqual('(* (! (! 1)) 2)')
-    expect(() => parse('1+')).toThrow('bad op')
+    expect(() => parse('1+')).toThrow('ParserUnknownError: [eof]')
     expect('' + parse('1 + +-1')).toEqual('(+ 1 (+ (- 1)))')
     expect('' + parse('1 + 2 * 3')).toEqual('(+ 1 (* 2 3))')
     expect('' + parse('a + b * c * d + e')).toEqual('(+ (+ a (* (* b c) d)) e)')
@@ -43,7 +43,7 @@ describe('parse', () => {
     // expect('' + parse('f . g--')).toEqual('(= (. f g) (- (. f g) 1))')
     // expect('' + parse('--!f . g')).toEqual('(-- (! (. f g)))')
     // expect('' + parse('!--f . g')).toEqual('(! (= (. f g) (- (. f g) 1)))')
-    expect(() => parse('-9!0')).toThrow('bad token')
+    expect(() => parse('-9!0')).toThrow('ParserUnknownError: [ops]: !')
     expect('' + parse('1+!0')).toEqual('(+ 1 (! 0))')
     // expect('' + parse('! f . g ')).toEqual('(! (. f g))')
     expect('' + parse('(((0)))')).toEqual('0')
@@ -57,18 +57,18 @@ describe('parse', () => {
   })
 
   it('throws on errors', () => {
-    expect(() => parse('(')).toThrow('bad token')
-    expect(() => parse('(1')).toThrow('bad token')
-    expect(() => parse('a[')).toThrow('bad token')
-    expect(() => parse('a[1')).toThrow('bad token')
+    expect(() => parse('(')).toThrow('Expected: \')\' [ops]')
+    expect(() => parse('(1')).toThrow('Expected: \')\' [ops]')
+    expect(() => parse('a[')).toThrow('Expected: \']\' [ops]')
+    expect(() => parse('a[1')).toThrow('Expected: \']\' [ops]')
     expect(() => parse('')).not.toThrow()
   })
 
   describe('multiline', () => {
     it('parses multiline', () => {
       expect(
-        '' +
-          parse(`
+        ''
+          + parse(`
           3 * 4
         + 5 * 6
         `)
@@ -77,25 +77,25 @@ describe('parse', () => {
 
     it('ignores single line comments', () => {
       expect(
-        '' +
-          parse(`
-          // comment
-          3 * 4 // a comment
+        ''
+          + parse(`
+          \\ comment
+          3 * 4 \\ a comment
         + 5 * 6
-        // more comments
+        \\ more comments
         `)
       ).toEqual('(+ (* 3 4) (* 5 6))')
     })
 
     it('ignores block comments', () => {
       expect(
-        '' +
-          parse(`
-          // comment
-          3/*careful
-          mutliline*/ * 4 // a comment
-        + 5 */*another*/ 6
-        // more comments
+        ''
+          + parse(`
+          \\ comment
+          3\\*careful
+          mutliline*\\ * 4 \\ a comment
+        + 5 *\\*another*\\ 6
+        \\ more comments
         `)
       ).toEqual('(+ (* 3 4) (* 5 6))')
     })
@@ -139,7 +139,9 @@ describe('parse', () => {
       expect('' + parse('a(z[0..2]=2)=x')).toEqual('(= (@ a (= ([ z (.. 0 2)) 2)) x)')
       expect('' + parse('a(.z[0..2]=2)=x')).toEqual('(= (@ a (= (. ([ z (.. 0 2))) 2)) x)')
       expect('' + parse('a(z[0..2],b[4.5..8.5])=x')).toEqual('(= (@ a (, ([ z (.. 0 2)) ([ b (.. 4.5 8.5)))) x)')
-      expect('' + parse('a(z[0..2]=1,b[4.5..8.5]=2)=x')).toEqual('(= (@ a (, (= ([ z (.. 0 2)) 1) (= ([ b (.. 4.5 8.5)) 2))) x)')
+      expect('' + parse('a(z[0..2]=1,b[4.5..8.5]=2)=x')).toEqual(
+        '(= (@ a (, (= ([ z (.. 0 2)) 1) (= ([ b (.. 4.5 8.5)) 2))) x)'
+      )
     })
   })
 
@@ -194,6 +196,36 @@ describe('parse', () => {
     it('beat/bar', () => {
       expect('' + parse('1b')).toEqual('(* 1 br)')
       expect('' + parse('1B')).toEqual('(* (* 1 br) mr)')
+    })
+  })
+
+  describe('semicolons', () => {
+    it('middle', () => {
+      expect('' + parse('1;1')).toEqual('(; 1 1)')
+      expect('' + parse('1;;1')).toEqual('(; 1 1)')
+      expect('' + parse('1;;;1')).toEqual('(; 1 1)')
+      expect('' + parse('1 ; ; ; 1')).toEqual('(; 1 1)')
+    })
+
+    it('head', () => {
+      expect('' + parse(';1')).toEqual('1')
+      expect('' + parse(';;1')).toEqual('1')
+      expect('' + parse(';;;1')).toEqual('1')
+      expect('' + parse('; ; ;1')).toEqual('1')
+    })
+
+    it('head + middle', () => {
+      expect('' + parse(';1;2')).toEqual('(; 1 2)')
+      expect('' + parse(';;1;;2')).toEqual('(; 1 2)')
+      expect('' + parse(';;;1;;;2')).toEqual('(; 1 2)')
+      expect('' + parse('; ; ;1; ; ; 2')).toEqual('(; 1 2)')
+    })
+
+    it('tail', () => {
+      expect('' + parse('1;')).toEqual('1')
+      expect('' + parse('1;;')).toEqual('1')
+      expect('' + parse('1;;;')).toEqual('1')
+      expect('' + parse('1; ; ;')).toEqual('1')
     })
   })
 })

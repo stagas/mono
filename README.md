@@ -13,7 +13,7 @@ mono is a low level language for audio expressions that compiles to wasm
  · <a href="https://github.com/stagas/mono/issues">   🖐️ <strong>Help</strong></a>
 </p>
 
-***
+---
 
 ## Install
 
@@ -29,41 +29,41 @@ $ npm i @stagas/mono
 
 #### Table of Contents
 
-*   [todo](#todo)
-*   [bin](#bin)
-    *   [Parameters](#parameters)
-*   [typebin](#typebin)
-    *   [Parameters](#parameters-1)
-*   [eq](#eq)
-    *   [Parameters](#parameters-2)
-*   [funcDef](#funcdef)
-    *   [Parameters](#parameters-3)
-*   [Op](#op)
-*   [OpArgs](#opargs)
-*   [build](#build)
-    *   [Parameters](#parameters-4)
-*   [map](#map)
-    *   [Parameters](#parameters-5)
-*   [typeOf](#typeof)
-    *   [Parameters](#parameters-6)
-*   [typeAs](#typeas)
-    *   [Parameters](#parameters-7)
-*   [cast](#cast)
-    *   [Parameters](#parameters-8)
-*   [castAll](#castall)
-    *   [Parameters](#parameters-9)
-*   [hi](#hi)
-    *   [Parameters](#parameters-10)
-*   [max](#max)
-    *   [Parameters](#parameters-11)
-*   [top](#top)
-    *   [Parameters](#parameters-12)
-*   [infer](#infer)
-    *   [Parameters](#parameters-13)
-*   [flatten](#flatten)
-    *   [Parameters](#parameters-14)
-*   [mush](#mush)
-    *   [Parameters](#parameters-15)
+- [todo](#todo)
+- [bin](#bin)
+  - [Parameters](#parameters)
+- [typebin](#typebin)
+  - [Parameters](#parameters-1)
+- [eq](#eq)
+  - [Parameters](#parameters-2)
+- [funcDef](#funcdef)
+  - [Parameters](#parameters-3)
+- [Op](#op)
+- [OpArgs](#opargs)
+- [build](#build)
+  - [Parameters](#parameters-4)
+- [map](#map)
+  - [Parameters](#parameters-5)
+- [typeOf](#typeof)
+  - [Parameters](#parameters-6)
+- [typeAs](#typeas)
+  - [Parameters](#parameters-7)
+- [cast](#cast)
+  - [Parameters](#parameters-8)
+- [castAll](#castall)
+  - [Parameters](#parameters-9)
+- [hi](#hi)
+  - [Parameters](#parameters-10)
+- [max](#max)
+  - [Parameters](#parameters-11)
+- [top](#top)
+  - [Parameters](#parameters-12)
+- [infer](#infer)
+  - [Parameters](#parameters-13)
+- [flatten](#flatten)
+  - [Parameters](#parameters-14)
+- [mush](#mush)
+  - [Parameters](#parameters-15)
 
 ### todo
 
@@ -79,8 +79,8 @@ constructs a binary op of least type `type`
 
 #### Parameters
 
-*   `type` **Type**&#x20;
-*   `op` **[string](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)**&#x20;
+- `type` **Type**&#x20;
+- `op` **[string](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)**&#x20;
 
 Returns **[Op](#op)**&#x20;
 
@@ -92,8 +92,8 @@ constructs a binary op of exact type `type`
 
 #### Parameters
 
-*   `type` **Type**&#x20;
-*   `op` **[string](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)**&#x20;
+- `type` **Type**&#x20;
+- `op` **[string](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)**&#x20;
 
 Returns **[Op](#op)**&#x20;
 
@@ -105,7 +105,7 @@ constructs an equality op
 
 #### Parameters
 
-*   `op` **[string](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)**&#x20;
+- `op` **[string](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)**&#x20;
 
 Returns **[Op](#op)**&#x20;
 
@@ -117,11 +117,11 @@ defines a function
 
 #### Parameters
 
-*   `ctx` **Context**&#x20;
-*   `ops` **OpTable**&#x20;
-*   `sym` **(Token | [string](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String))**&#x20;
-*   `args` **[Array](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array)<[Node](https://developer.mozilla.org/docs/Web/API/Node/nextSibling)>**&#x20;
-*   `rhs` **[Node](https://developer.mozilla.org/docs/Web/API/Node/nextSibling)**&#x20;
+- `ctx` **Context**&#x20;
+- `ops` **OpTable**&#x20;
+- `sym` **(Token | [string](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String))**&#x20;
+- `args` **[Array](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array)<[Node](https://developer.mozilla.org/docs/Web/API/Node/nextSibling)>**&#x20;
+- `rhs` **[Node](https://developer.mozilla.org/docs/Web/API/Node/nextSibling)**&#x20;
 
 ### Op
 
@@ -147,9 +147,9 @@ builds a `node` under context `ctx` and optable `ops`
 
 #### Parameters
 
-*   `node` **[Node](https://developer.mozilla.org/docs/Web/API/Node/nextSibling)**&#x20;
-*   `ctx` **Context**&#x20;
-*   `ops` **OpTable**&#x20;
+- `node` **[Node](https://developer.mozilla.org/docs/Web/API/Node/nextSibling)**&#x20;
+- `ctx` **Context**&#x20;
+- `ops` **OpTable**&#x20;
 
 Returns **SExpr**&#x20;
 
@@ -161,9 +161,9 @@ builds an array of `nodes` under context `ctx` and optable `ops`
 
 #### Parameters
 
-*   `nodes` **[Array](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array)<[Node](https://developer.mozilla.org/docs/Web/API/Node/nextSibling)>**&#x20;
-*   `ctx` **Context**&#x20;
-*   `ops` **OpTable**&#x20;
+- `nodes` **[Array](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array)<[Node](https://developer.mozilla.org/docs/Web/API/Node/nextSibling)>**&#x20;
+- `ctx` **Context**&#x20;
+- `ops` **OpTable**&#x20;
 
 Returns **[Array](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array)\<SExpr>**&#x20;
 
@@ -175,7 +175,7 @@ looks up and returns the type of `x`, if found, otherwise returns type `any`
 
 #### Parameters
 
-*   `x` **([undefined](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/undefined) | [string](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String) | SExpr)**&#x20;
+- `x` **([undefined](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/undefined) | [string](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String) | SExpr)**&#x20;
 
 Returns **Type**&#x20;
 
@@ -187,8 +187,8 @@ marks sexpr `x` to be of type `type`
 
 #### Parameters
 
-*   `type` **Type**&#x20;
-*   `x` **SExpr**&#x20;
+- `type` **Type**&#x20;
+- `x` **SExpr**&#x20;
 
 ### cast
 
@@ -198,8 +198,8 @@ creates a cast operation if the given value `x` doesn't satisfy `type`
 
 #### Parameters
 
-*   `type` **Type**&#x20;
-*   `x` **SExpr**&#x20;
+- `type` **Type**&#x20;
+- `x` **SExpr**&#x20;
 
 ### castAll
 
@@ -209,8 +209,8 @@ casts all `values` to be of type `type`
 
 #### Parameters
 
-*   `type` **Type**&#x20;
-*   `values` **...SExpr**&#x20;
+- `type` **Type**&#x20;
+- `values` **...SExpr**&#x20;
 
 Returns **SExpr**&#x20;
 
@@ -222,7 +222,7 @@ returns the highest precision type of the given values
 
 #### Parameters
 
-*   `values` **...SExpr**&#x20;
+- `values` **...SExpr**&#x20;
 
 Returns **Type**&#x20;
 
@@ -234,8 +234,8 @@ returns at least the precision of the given type among the given types
 
 #### Parameters
 
-*   `type` **Type**&#x20;
-*   `types` **...[Array](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array)\<Type>**&#x20;
+- `type` **Type**&#x20;
+- `types` **...[Array](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array)\<Type>**&#x20;
 
 Returns **Type**&#x20;
 
@@ -247,8 +247,8 @@ types an operation with the correct prefix (f32 or i32) and type casts the value
 
 #### Parameters
 
-*   `type` **Type**&#x20;
-*   `ops` **SExpr**&#x20;
+- `type` **Type**&#x20;
+- `ops` **SExpr**&#x20;
 
 Returns **SExpr**&#x20;
 
@@ -260,7 +260,7 @@ infers the type of a token literal string: bool for 0 or 1, i32 for integers and
 
 #### Parameters
 
-*   `x` **Token**&#x20;
+- `x` **Token**&#x20;
 
 Returns **Type**&#x20;
 
@@ -272,8 +272,8 @@ flattens a node that is left hand side recursing on symbol `sym`
 
 #### Parameters
 
-*   `sym` **[string](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)**&#x20;
-*   `x` **[Node](https://developer.mozilla.org/docs/Web/API/Node/nextSibling)**&#x20;
+- `sym` **[string](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String)**&#x20;
+- `x` **[Node](https://developer.mozilla.org/docs/Web/API/Node/nextSibling)**&#x20;
 
 Returns **[Array](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array)<[Node](https://developer.mozilla.org/docs/Web/API/Node/nextSibling)>**&#x20;
 
@@ -285,8 +285,8 @@ Merges or pUSHes `obj` to array `arr`
 
 #### Parameters
 
-*   `arr` **[Array](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array)\<any>**&#x20;
-*   `obj` **any**&#x20;
+- `arr` **[Array](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array)\<any>**&#x20;
+- `obj` **any**&#x20;
 
 ## Contribute
 

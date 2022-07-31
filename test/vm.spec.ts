@@ -39,7 +39,7 @@ describe('VM', () => {
   it('can produce output', async () => {
     const vm = new VM()
     await vm.setCode('f(x)=x')
-    vm.exports.fill(0, 3, 42)
+    vm.exports.fill(0, 0, 3, 42)
     expect([...vm.outputs[0].slice(0, 3)]).toEqual([42, 42, 42])
   })
 
@@ -47,40 +47,37 @@ describe('VM', () => {
     it('can hot swap code', async () => {
       const vm = new VM()
       await vm.setCode('f(x)=x')
-      vm.exports.fill(0, 3, 42)
+      vm.exports.fill(0, 0, 3, 42)
       expect([...vm.outputs[0].slice(0, 3)]).toEqual([42, 42, 42])
       await vm.setCode('f(x)=x+27')
-      vm.exports.fill(0, 3, 42)
+      vm.exports.fill(0, 0, 3, 42)
       expect([...vm.outputs[0].slice(0, 3)]).toEqual([69, 69, 69])
     })
 
     it('can be called many times without crashing', async () => {
       const vm = new VM()
       await vm.setCode('f(x)=x')
-      for (let i = 0; i < 1000; i++) {
-        vm.exports.fill(0, 44100, 42)
-      }
+      for (let i = 0; i < 1000; i++)
+        vm.exports.fill(0, 0, 44100, 42)
       expect([...vm.outputs[0].slice(0, 3)]).toEqual([42, 42, 42])
     })
 
     it('can be called many times after hot swapping without crashing', async () => {
       const vm = new VM()
       await vm.setCode('f(x)=x')
-      for (let i = 0; i < 1000; i++) {
-        vm.exports.fill(0, 44100, 42)
-      }
+      for (let i = 0; i < 1000; i++)
+        vm.exports.fill(0, 0, 44100, 42)
       expect([...vm.outputs[0].slice(0, 3)]).toEqual([42, 42, 42])
       await vm.setCode('f(x)=x+27')
-      for (let i = 0; i < 1000; i++) {
-        vm.exports.fill(0, 44100, 42)
-      }
+      for (let i = 0; i < 1000; i++)
+        vm.exports.fill(0, 0, 44100, 42)
       expect([...vm.outputs[0].slice(0, 3)]).toEqual([69, 69, 69])
     })
 
     it('can hot swap with complex code', async () => {
       const vm = new VM()
       await vm.setCode(`\
-        #voices:(16,2); // voices (time,hz)
+        #voices:(16,2); \\ voices (time,hz)
         note_to_hz(x)=440*2^((x-33)/12);
         note_on(x)=(hz=note_to_hz(x);#voices=(t,hz);0);
         sine(hz=330.0)=({p};{p}+=(pi2*hz/sr)+(p>pi2?-pi2:0);sin(p));
@@ -94,11 +91,11 @@ describe('VM', () => {
         );
         f()=(#voices::play)*0.1
       `)
-      vm.exports.fill(0, 44100)
+      vm.exports.fill(0, 0, 44100)
       expect([...vm.outputs[0].slice(0, 10)]).toMatchSnapshot()
 
       await vm.setCode(`\
-        #voices:(16,2); // voices (time,hz)
+        #voices:(16,2); \\ voices (time,hz)
         note_to_hz(x)=440*2^((x-33)/12);
         note_on(x)=(hz=note_to_hz(x);#voices=(t,hz);0);
         sine(hz=330.0)=({p};{p}+=(pi2*hz/sr)+(p>pi2?-pi2:0);sin(p));
@@ -112,7 +109,7 @@ describe('VM', () => {
         );
         f()=(#voices::play)*0.1
       `)
-      vm.exports.fill(0, 44100)
+      vm.exports.fill(0, 0, 44100)
 
       expect([...vm.outputs[0].slice(0, 10)]).toMatchSnapshot()
     })
@@ -120,7 +117,7 @@ describe('VM', () => {
     it('can hot swap adding lp', async () => {
       const vm = new VM()
       await vm.setCode(`\
-        #voices:(16,2); // voices (time,hz)
+        #voices:(16,2); \\ voices (time,hz)
         note_to_hz(x)=440*2^((x-33)/12);
         note_on(x)=(hz=note_to_hz(x);#voices=(t,hz);0);
         sine(hz=330.0)=({p};{p}+=(pi2*hz/sr)+(p>pi2?-pi2:0);sin(p));
@@ -134,11 +131,11 @@ describe('VM', () => {
         );
         f()=(#voices::play)*0.1
       `)
-      vm.exports.fill(0, 44100)
+      vm.exports.fill(0, 0, 44100)
       expect([...vm.outputs[0].slice(0, 10)]).toMatchSnapshot()
 
       await vm.setCode(`\
-        #voices:(16,2); // voices (time,hz)
+        #voices:(16,2); \\ voices (time,hz)
         note_to_hz(x)=440*2^((x-33)/12);
         note_on(x)=(hz=note_to_hz(x);#voices=(t,hz);0);
         sine(hz=330.0)=({p};{p}+=(pi2*hz/sr)+(p>pi2?-pi2:0);sin(p));
@@ -152,7 +149,7 @@ describe('VM', () => {
         );
         f()=(#voices::play)*0.1
       `)
-      vm.exports.fill(0, 44100)
+      vm.exports.fill(0, 0, 44100)
 
       expect([...vm.outputs[0].slice(0, 10)]).toMatchSnapshot()
     })
