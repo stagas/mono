@@ -9,14 +9,24 @@ import { Type } from './typed'
 
 const defaultConfig: LinkerConfig = {
   memory: {
-    initial: 256, // TODO: autocalculate page size
-    maximum: 256,
+    initial: 32, // TODO: autocalculate page size
+    maximum: 32,
   },
   metrics: false,
 }
 
+const parseArg =
+  /(?<arg>\.?\s*(?<id>[a-zA-Z_$][a-zA-Z0-9_$]*)(?<range>\[[^\]]*?\])?(=.*?(?<default>[^\s,)]+)?)?).*?(,|\)\s*=)/s
+
 export class MonoParam {
-  id!: string
+  id!: Token
+  sourceIndex!: number
+  source!: {
+    arg: string
+    id: string
+    range: string
+    default: string
+  }
   name!: string
   minValue!: number
   maxValue!: number
@@ -33,15 +43,23 @@ export class MonoParam {
   normalize(value: number) {
     return (value - this.minValue) / this.scaleValue
   }
+
+  scale(normal: number) {
+    return normal * this.scaleValue + this.minValue
+  }
 }
 
 export class VM {
   isReady = false
   skipMono = false
 
+  code = ''
+
   config: LinkerConfig
 
   linker: Linker
+  module?: Module
+  instance?: WebAssembly.Instance
 
   inputs: Float32Array[]
   outputs: Float32Array[]
@@ -61,7 +79,7 @@ export class VM {
   }
 
   get exports() {
-    return this.linker.instance!.exports as {
+    return this.instance?.exports as {
       [k: string]: ((...args: number[]) => number) | WebAssembly.Global | any
     } & libvm.VM
   }
@@ -71,7 +89,7 @@ export class VM {
   }
 
   get params(): MonoParam[] {
-    return Object.values(this.linker.module!.funcs)
+    return Object.values(this.module?.funcs ?? {})
       .map(f => [f.id, f.params.filter(p => p.export)])
       .filter(x => x[1].length)
       .map(
@@ -81,13 +99,21 @@ export class VM {
             const export_id_min = p.id.as('export/' + id + '/' + p.id + '/min') as Token
             const export_id_max = p.id.as('export/' + id + '/' + p.id + '/max') as Token
 
-            const minValue = (this.linker.instance!.exports[export_id_min] as any)?.value ?? 0
-            const maxValue = (this.linker.instance!.exports[export_id_max] as any)?.value ?? 1
-            const defaultValue =
-              (this.linker.instance!.exports[export_id] as any)?.value ?? (maxValue - minValue) * 0.5 + minValue
+            const minValue = (this.instance!.exports[export_id_min] as any)?.value ?? 0
+            const maxValue = (this.instance!.exports[export_id_max] as any)?.value ?? 1
+            const defaultValue = (this.instance!.exports[export_id] as any)?.value
+              ?? (maxValue - minValue) * 0.5 + minValue
+
+            // find the index of the dot `.` that made the param export by moving
+            // backwards from the id index that we have access to here
+            const code = p.id.source.input
+            const sourceIndex = code.lastIndexOf('.', export_id.source.index)
+            const source = code.slice(sourceIndex).match(parseArg)!.groups as MonoParam['source']
 
             return new MonoParam({
               id: export_id,
+              sourceIndex,
+              source,
               name: export_id.toString(),
               minValue,
               maxValue,
@@ -101,16 +127,26 @@ export class VM {
   }
 
   get f_type(): Type {
-    return this.linker.module!.typeOf(this.funcs.f.body)
+    return this.linker.module!.typeOf(this.funcs.f?.body)
   }
 
   get f_params(): Arg[] {
-    return this.funcs.f.params //.map(argToMonoParam)
+    return this.funcs.f?.params ?? [] // .map(argToMonoParam)
   }
 
   async setCode(code: string) {
     this.linker.link(code)
     await this.linker.make()
+
+    // update code only after linker has been successful
+    this.code = code
+
+    // we copy these because they are instantiated at two async steps
+    // before the linker is ready, and "module" and "instance" can diverge
+    // if we were to access them directly from the linker, leading to errors
+    this.module = this.linker.module
+    this.instance = this.linker.instance
+
     this.isReady = true
     this.config.metrics && console.log('mono: ready')
   }
