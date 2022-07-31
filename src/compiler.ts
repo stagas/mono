@@ -1,12 +1,29 @@
 // import rfdc from 'rfdc'
+import * as CompilerErrorCauses from './causes'
 import { Node, Token } from './parser'
 import { SExpr } from './sexpr'
 import { Type, Typed } from './typed'
 import { flatten, mush } from './util'
 
+export { CompilerErrorCauses }
 // const copy = rfdc({ proto: true, circles: false })
 
 export type { Token }
+
+export interface CompilerError extends Error {
+  cause:
+    | CompilerErrorCauses.ReferenceErrorCause
+    | CompilerErrorCauses.SyntaxErrorCause
+    | CompilerErrorCauses.TypeErrorCause
+    | CompilerErrorCauses.InvalidErrorCause
+}
+
+export class CompilerError extends Error {
+  name = 'CompilerError'
+  constructor(cause: Error) {
+    super(cause.message, { cause })
+  }
+}
 
 interface Op {
   (...sexprs: SExpr[]): SExpr
@@ -91,11 +108,8 @@ export const compile = (node: Node, scope: Scope = {}, includes: Includes = {}, 
   const funcs: Module['funcs'] = {}
   const bodies: Map<Func, Node> = new Map()
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const panic = (node as any).panic // TODO: resolve this in tinypratt
-
   // create types
-  const { typeOf, typeAs, cast, castAll, hi, max, top, infer } = Typed(panic)
+  const { typeOf, typeAs, cast, castAll, hi, max, top, infer } = Typed()
 
   // included ambient functions (declared elsewhere or from a previous step)
   for (const [name, func] of Object.entries(includes)) {
@@ -202,7 +216,7 @@ export const compile = (node: Node, scope: Scope = {}, includes: Includes = {}, 
   /** function call */
   const funcCall = (sym: Token, args: SExpr[]) => {
     const func = funcs[sym]
-    if (!func) throw new ReferenceError(panic('function not defined', sym))
+    if (!func) throw new CompilerError(new CompilerErrorCauses.ReferenceErrorCause(sym, 'function not defined'))
     // console.log('CALLING', sym, 'TYPE', body, type)
 
     // examine function argument declarations against passed arguments
@@ -259,7 +273,11 @@ export const compile = (node: Node, scope: Scope = {}, includes: Includes = {}, 
       (local, ops) =>
         (lhs, rhs) => {
           const sym = lhs
-          if (sym[0] !== '#') throw new SyntaxError(panic('buffer variables must begin with a hash(`#`) symbol', lhs))
+          if (sym[0] !== '#') {
+            throw new CompilerError(
+              new CompilerErrorCauses.SyntaxErrorCause(lhs, 'buffer variables must begin with a hash(`#`) symbol')
+            )
+          }
 
           // get size,elements (elements default to 1)
           const [size_raw, elements] = flatten(',', rhs) as [Node, Token]
@@ -315,11 +333,18 @@ export const compile = (node: Node, scope: Scope = {}, includes: Includes = {}, 
       local =>
         (lhs, rhs) => {
           const sym = lhs
-          if (sym[0] !== '#')
-            throw new SyntaxError(panic('map/reduce `::` operator\'s left hand side must be a buffer variable', lhs))
+          if (sym[0] !== '#') {
+            throw new CompilerError(
+              new CompilerErrorCauses.SyntaxErrorCause(
+                lhs,
+                'map/reduce `::` operator\'s left hand side must be a buffer variable'
+              )
+            )
+          }
 
           const buffer_scope = lookup(local, sym)
-          if (!(sym in buffer_scope)) throw new ReferenceError(panic('symbol not defined', sym))
+          if (!(sym in buffer_scope))
+            throw new CompilerError(new CompilerErrorCauses.ReferenceErrorCause(sym, 'symbol not defined'))
 
           const elements = get_elements(local, sym)
 
@@ -407,14 +432,15 @@ export const compile = (node: Node, scope: Scope = {}, includes: Includes = {}, 
                 // (x,y)=#(z) : buffer read at offset `z` and expand/destructure tuple values to variables `x,y`
                 if (sym[0] == '#') {
                   const scope = lookup(local, sym)
-                  if (!(sym in scope)) throw new ReferenceError(panic('symbol not defined', sym))
+                  if (!(sym in scope))
+                    throw new CompilerError(new CompilerErrorCauses.ReferenceErrorCause(sym, 'symbol not defined'))
 
                   const elements = get_elements(local, sym)
                   if (vars.length > +elements) {
-                    throw new TypeError(
-                      panic(
-                        `number of variables(\`${vars.length}\`) are greater than the number of elements(\`${elements}\`)`,
-                        vars.at(-1)
+                    throw new CompilerError(
+                      new CompilerErrorCauses.TypeErrorCause(
+                        vars.at(-1)!,
+                        `number of variables(\`${vars.length}\`) are greater than the number of elements(\`${elements}\`)`
                       )
                     )
                   }
@@ -437,16 +463,16 @@ export const compile = (node: Node, scope: Scope = {}, includes: Includes = {}, 
                   ]
                 } // (a,b)=f() : TODO: function call multi-value return assignment
                 else {
-                  throw new Error(panic('not implemented', sym))
+                  throw new CompilerError(new CompilerErrorCauses.InvalidErrorCause(sym, 'not implemented'))
                 }
               } // else try regular var=value assignment
               else {
                 const vals_raw = flatten(',', rhs)
                 if (vars.length != vals_raw.length) {
-                  throw new TypeError(
-                    panic(
-                      `number of values(\`${vals_raw.length}\`) do not match number of variables(\`${vars.length}\`)`,
-                      rhs[0]
+                  throw new CompilerError(
+                    new CompilerErrorCauses.TypeErrorCause(
+                      rhs[0] as Token,
+                      `number of values(\`${vals_raw.length}\`) do not match number of variables(\`${vars.length}\`)`
                     )
                   )
                 }
@@ -455,20 +481,26 @@ export const compile = (node: Node, scope: Scope = {}, includes: Includes = {}, 
               }
             } // invalid
             else {
-              throw new SyntaxError(panic('invalid assignment', lhs[0]))
+              throw new CompilerError(
+                new CompilerErrorCauses.SyntaxErrorCause(lhs[0], 'invalid assignment')
+              )
             }
           } else {
             // #x=y | #x=(y,z): buffer write and advance needle
             if (lhs[0] === '#') {
               const sym = lhs
               const scope = lookup(local, sym)
-              if (!(sym in scope)) throw new ReferenceError(panic('symbol not defined', sym))
+              if (!(sym in scope))
+                throw new CompilerError(new CompilerErrorCauses.ReferenceErrorCause(sym, 'symbol not defined'))
 
               const elements = get_elements(local, sym)
               const rhs_raw = flatten(',', rhs)
               if (+elements != rhs_raw.length) {
-                throw new TypeError(
-                  panic(`number of values(\`${rhs_raw.length}\`) do not match number of elements(\`${elements}\`)`, lhs)
+                throw new CompilerError(
+                  new CompilerErrorCauses.TypeErrorCause(
+                    lhs,
+                    `number of values(\`${rhs_raw.length}\`) do not match number of elements(\`${elements}\`)`
+                  )
                 )
               }
 
@@ -651,7 +683,8 @@ export const compile = (node: Node, scope: Scope = {}, includes: Includes = {}, 
           // #b(x) : buffer read `b` at offset `x`
           if (sym[0] === '#') {
             const scope = lookup(local, sym)
-            if (!(sym in scope)) throw new ReferenceError(panic('symbol not defined', sym))
+            if (!(sym in scope))
+              throw new CompilerError(new CompilerErrorCauses.ReferenceErrorCause(sym, 'symbol not defined'))
             const offset = build(rhs, local, ops)
             return typeAs(Type.f32, ['f32.load offset=4', buffer_pos(local, scope, sym, offset)])
           } // f() : function call
@@ -669,7 +702,8 @@ export const compile = (node: Node, scope: Scope = {}, includes: Includes = {}, 
       local =>
         sym => {
           const scope = lookup(local, sym) // sym in local.scope ? local.scope : sym in global.scope ? global.scope : local.scope
-          if (!(sym in scope)) throw new ReferenceError(panic('symbol not defined', sym))
+          if (!(sym in scope))
+            throw new CompilerError(new CompilerErrorCauses.ReferenceErrorCause(sym, 'symbol not defined'))
           const type = scope[sym]
           return typeAs(type, [scoped(scope, 'get'), '$' + sym])
         },
@@ -712,7 +746,19 @@ export const compile = (node: Node, scope: Scope = {}, includes: Includes = {}, 
     '[': (): CtxOp =>
       local =>
         (id, rhs) => {
+          if (rhs == null) {
+            throw new CompilerError(
+              new CompilerErrorCauses.InvalidErrorCause(id, 'Invalid parameter range for')
+            )
+          }
+
           const range = build(rhs, local, Op) as [SExpr, SExpr]
+          if (!Array.isArray(range[0]) || !Array.isArray(range[1])) {
+            throw new CompilerError(
+              new CompilerErrorCauses.InvalidErrorCause(id, 'Invalid parameter range for')
+            )
+          }
+
           const param = mush(local.params, { id, range }) as Arg
           const type = hi(param.default!, ...range)
 
@@ -741,12 +787,12 @@ export const compile = (node: Node, scope: Scope = {}, includes: Includes = {}, 
       const [sym, ...nodes] = node as [Token, Node[]]
       if (!sym || !nodes.length) return []
       let op = ops[sym]
-      if (!op) throw new Error(panic('not implemented', sym))
+      if (!op) throw new CompilerError(new CompilerErrorCauses.InvalidErrorCause(sym, 'not implemented'))
       if (Array.isArray(op)) op = op.find(x => x.length === nodes.length) || op[0]
       return op.length ? (<Op> op)(...map(nodes, ctx, ops)) : (<() => NodeOp> op)()(ctx, ops)(...nodes)
     } else {
       const op = ops[node.group]
-      if (!op) throw new Error(panic ? panic('not implemented', node) : 'not implemented: ' + node)
+      if (!op) throw new CompilerError(new CompilerErrorCauses.InvalidErrorCause(node, 'not implemented'))
       return (<() => CtxOp> op)()(ctx, ops)(node)
     }
   }

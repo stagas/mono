@@ -1,5 +1,6 @@
 import { Token } from 'lexer-next'
 import { Arg } from './compiler'
+import { Module } from './compiler'
 import * as libmono from './lib/mono'
 import * as libvm from './lib/vm'
 import * as libwat from './lib/wat'

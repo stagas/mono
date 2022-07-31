@@ -1,3 +1,4 @@
+import { CompilerError, CompilerErrorCauses } from './compiler'
 import { Token } from './parser'
 import { SExpr } from './sexpr'
 
@@ -17,7 +18,7 @@ export const max = (type: Type, ...types: Type[]): Type => {
   return Types[Math.max(Types.indexOf(type), ...types.map(x => Types.indexOf(x)))]
 }
 
-export const Typed = (panic: (s: string, t: string) => string) => {
+export const Typed = () => {
   const types = new Map<object | string, Type>()
 
   const OpTypeCast: Record<Type, Partial<Record<Type, string>>> = {
@@ -77,7 +78,7 @@ export const Typed = (panic: (s: string, t: string) => string) => {
     if (x == '0' || x == '1') return Type.bool
     else if (!x.includes('.')) return Type.i32
     else if (x.includes('.')) return Type.f32
-    else throw new TypeError(panic('cannot infer type for', x))
+    else throw new CompilerError(new CompilerErrorCauses.TypeErrorCause(x, 'cannot infer type for'))
   }
 
   return { typeOf, typeAs, cast, castAll, hi, max, top, infer }
