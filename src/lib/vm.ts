@@ -14,8 +14,8 @@ export const env = (config: LinkerConfig) => `;;wasm
   (global $output_mem_ptr (i32) (i32.const 0))
   (global $input_mem_ptr (i32) (i32.const 0x40000))
   (global $global_mem_ptr (export "global_mem_ptr") (mut i32) (i32.const 0x80000))
-  (global $sr (mut f32) (f32.const 44100.0))
-  (global $t (mut f32) (f32.const 0))
+  (global $sr (export "sampleRate") (mut f32) (f32.const 44100.0))
+  (global $t (export "currentTime") (mut f32) (f32.const 0))
   (global $pi (f32) (f32.const 3.1415927410125732))
   (global $pi2 (f32) (f32.const 6.2831854820251465))
 `
