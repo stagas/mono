@@ -31,6 +31,10 @@ export const modwrap = `
 modwrap(x,N)=(x%N+N)%N
 `
 
+export const denan = `
+denan(x=0f)=x-x!=0f?0f:x
+`
+
 // export const dly = `
 // dly(x, len[1..44100]=500.0, fb[0..1]=0.2)=(
 //   ##44100;    // 1s buffer

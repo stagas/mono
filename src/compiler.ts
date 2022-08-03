@@ -140,6 +140,12 @@ export const compile = (node: Node, scope: Scope = {}, includes: Includes = {}, 
   /** todo is a "not implemented" marker for ops */
   const todo = null
 
+  /** zeroifies inf and nan */
+  const denan = (body: SExpr | Node) =>
+    typeOf(body) !== Type.f32
+      ? body
+      : ['call', '$denan', body]
+
   /** constructs a binary op of least type `type` */
   const bin = (type: Type, op: string): Op => (lhs, rhs) => top(max(type, hi(lhs, rhs)), [op, lhs, rhs])
 
@@ -172,7 +178,7 @@ export const compile = (node: Node, scope: Scope = {}, includes: Includes = {}, 
     const scope = lookup(local, sym)
     // if symbol is not found in scope, we create it (lazy variable declaration)
     const type = sym in scope ? scope[sym] : (scope[sym] = typeOf(value))
-    return typeAs(type, [scoped(scope, 'set'), '$' + sym, cast(type, value)])
+    return typeAs(type, [scoped(scope, 'set'), '$' + sym, denan(cast(type, value))])
   }
 
   /** returns buffer position for `offset` for buffer `id` in `scope` */
@@ -355,45 +361,45 @@ export const compile = (node: Node, scope: Scope = {}, includes: Includes = {}, 
 
           // dprint-ignore
           return typeAs(Type.f32, [
-        [scoped(local.scope, 'set'), '$temp_index', ['i32.const', '0']],
-        [scoped(local.scope, 'set'), '$temp_sum', ['f32.const', '0']],
-        [scoped(local.scope, 'set'), '$temp_buffer_pos', [scoped(buffer_scope, 'get'), '$' + sym]],
-        [scoped(local.scope, 'set'), '$temp_buffer_one_index_length',
-          ['i32.shl',
-            ['i32.const', elements],
-            ['i32.const', '2']
-          ]
-        ],
-        ['loop $loop',
-          [scoped(local.scope, 'set'), '$temp_sum',
-            ['f32.add',
-              [scoped(local.scope, 'get'), '$temp_sum'],
-              funcCall(rhs as Token, Array.from({ length: +elements }).map((_, i) =>
-                typeAs(Type.f32, [`f32.load offset=${(i+1) * 4}`,
+            [scoped(local.scope, 'set'), '$temp_index', ['i32.const', '0']],
+            [scoped(local.scope, 'set'), '$temp_sum', ['f32.const', '0']],
+            [scoped(local.scope, 'set'), '$temp_buffer_pos', [scoped(buffer_scope, 'get'), '$' + sym]],
+            [scoped(local.scope, 'set'), '$temp_buffer_one_index_length',
+              ['i32.shl',
+                ['i32.const', elements],
+                ['i32.const', '2']
+              ]
+            ],
+            ['loop $loop',
+              [scoped(local.scope, 'set'), '$temp_sum',
+                ['f32.add',
+                  [scoped(local.scope, 'get'), '$temp_sum'],
+                  funcCall(rhs as Token, Array.from({ length: +elements }).map((_, i) =>
+                    typeAs(Type.f32, [`f32.load offset=${(i+1) * 4}`,
+                      [scoped(local.scope, 'get'), '$temp_buffer_pos'],
+                    ])
+                  )),
+                ]
+              ],
+              [scoped(local.scope, 'set'), '$temp_buffer_pos',
+                ['i32.add',
                   [scoped(local.scope, 'get'), '$temp_buffer_pos'],
-                ])
-              )),
-            ]
-          ],
-          [scoped(local.scope, 'set'), '$temp_buffer_pos',
-            ['i32.add',
-              [scoped(local.scope, 'get'), '$temp_buffer_pos'],
-              [scoped(local.scope, 'get'), '$temp_buffer_one_index_length'],
-            ]
-          ],
-          // i++
-          [scoped(local.scope, 'set'), '$temp_index',
-            ['i32.add', [scoped(local.scope, 'get'), '$temp_index'], ['i32.const', '1']]],
-          // if (i !== buffer_size) continue $loop
-          ['br_if $loop',
-            ['i32.ne',
-              [scoped(local.scope, 'get'), '$temp_index'],
-              [scoped(buffer_scope, 'get'), '$' + sym + '_size']
-            ]
-          ],
-        ],
-        [scoped(local.scope, 'get'), '$temp_sum']
-      ])
+                  [scoped(local.scope, 'get'), '$temp_buffer_one_index_length'],
+                ]
+              ],
+              // i++
+              [scoped(local.scope, 'set'), '$temp_index',
+                ['i32.add', [scoped(local.scope, 'get'), '$temp_index'], ['i32.const', '1']]],
+              // if (i !== buffer_size) continue $loop
+              ['br_if $loop',
+                ['i32.ne',
+                  [scoped(local.scope, 'get'), '$temp_index'],
+                  [scoped(buffer_scope, 'get'), '$' + sym + '_size']
+                ]
+              ],
+            ],
+            [scoped(local.scope, 'get'), '$temp_sum']
+          ])
         },
 
     '=': (): CtxOp =>
@@ -515,19 +521,19 @@ export const compile = (node: Node, scope: Scope = {}, includes: Includes = {}, 
 
               // dprint-ignore
               return [
-            // write buffer position in temporary variable
-            [scoped(scope, 'set'), '$temp_buffer_pos', buffer_pos(local, scope, sym)],
-            // write vals at current needle position (offset i+1 because of needle 1 byte)
-            ...vals.map((val, i) => [
-              `f32.store offset=${(i+1) * 4}`,
-              [scoped(scope, 'get'), '$temp_buffer_pos'],
-              cast(Type.f32, val)
-            ]),
-            // advance needle
-            [scoped(scope, 'set'), '$' + sym + '_needle', ['i32.add', ['i32.const', '1'], needle]],
-            // write needle
-            ['i32.store', [scoped(scope, 'get'), '$' + sym], needle],
-          ]
+                // write buffer position in temporary variable
+                [scoped(scope, 'set'), '$temp_buffer_pos', buffer_pos(local, scope, sym)],
+                // write vals at current needle position (offset i+1 because of needle 1 byte)
+                ...vals.map((val, i) => [
+                  `f32.store offset=${(i+1) * 4}`,
+                  [scoped(scope, 'get'), '$temp_buffer_pos'],
+                  denan(cast(Type.f32, val))
+                ]),
+                // advance needle
+                [scoped(scope, 'set'), '$' + sym + '_needle', ['i32.add', ['i32.const', '1'], needle]],
+                // write needle
+                ['i32.store', [scoped(scope, 'get'), '$' + sym], needle],
+              ]
             } // x=y : variable assignment
             else {
               const sym = lhs
