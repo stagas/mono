@@ -643,7 +643,9 @@ export const compile = (node: Node, scope: Scope = {}, includes: Includes = {}, 
     // x*y : arithmetic multiply
     '*': bin(Type.i32, 'mul'),
     // x/y : arithmetic divide
-    '/': bin(Type.i32, 'div'),
+    //  note: division casts to float, this way it doesn't trap and
+    //    also makes more sense: 1/2==0.5
+    '/': bin(Type.f32, 'div'),
     // x%y : modulo/remainder
     '%': (lhs, rhs) => {
       const type = hi(lhs, rhs)
