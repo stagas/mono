@@ -1,0 +1,43 @@
+
+exports[`denan ignores 1`] = `
+"
+  (global.set $x 
+    (call $denan 
+      (f32.div 
+        (f32.convert_i32_u 
+          (i32.const 0)) 
+        (f32.convert_i32_u 
+          (i32.const 0)))))"
+`;
+
+exports[`denan works 1`] = `
+"
+  (global.set $x 
+    (call $denan 
+      (f32.div 
+        (f32.const 0.0) 
+        (f32.const 0.0))))"
+`;
+
+exports[`denan func 1`] = `
+"
+  (start $__start__) 
+  (func $__begin__ 
+    (export \\"__begin__\\")) 
+  (func $__start__ 
+    (export \\"__start__\\") 
+    (call $__begin__)) 
+  (func $denan 
+    (export \\"denan\\") 
+    (param $x f32) 
+    (result f32) 
+    (select 
+      (f32.const 0.0) 
+      (local.get $x) 
+      (f32.ne 
+        (f32.sub 
+          (local.get $x) 
+          (local.get $x)) 
+        (f32.convert_i32_u 
+          (i32.const 0)))))"
+`;

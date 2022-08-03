@@ -1,57 +1,78 @@
 
 exports[`compile parser node 1`] = `
 "
-  (call $__begin__)"
+  (i32.const 1)"
 `;
 
 exports[`compile x+y add op 1`] = `
 "
-  (call $__begin__)"
+  (i32.add 
+    (i32.const 1) 
+    (i32.const 2))"
 `;
 
-exports[`compile x+y add op 1`] = `
+exports[`compile x+y add op float 1`] = `
 "
-  (call $__begin__)"
+  (f32.add 
+    (f32.const 1.5) 
+    (f32.convert_i32_u 
+      (i32.const 1)))"
 `;
 
 exports[`compile x+y add w/ type cast i32 -> i32 1`] = `
 "
-  (call $__begin__)"
+  (i32.add 
+    (i32.const 1) 
+    (i32.const 2))"
 `;
 
 exports[`compile x+y add w/ type cast i32 -> bool 1`] = `
 "
-  (call $__begin__)"
+  (i32.add 
+    (i32.const 1) 
+    (i32.const 2))"
 `;
 
 exports[`compile x+y add w/ type cast bool -> i32 1`] = `
 "
-  (call $__begin__)"
+  (i32.add 
+    (i32.const 1) 
+    (i32.const 1))"
 `;
 
 exports[`compile !x logical Not 1`] = `
 "
-  (call $__begin__)"
+  (i32.eqz 
+    (i32.const 1))"
 `;
 
 exports[`compile !x logical Not w/ f32 1`] = `
 "
-  (call $__begin__)"
+  (i32.eqz 
+    (i32.trunc_f32_u 
+      (f32.const 1.0)))"
 `;
 
 exports[`compile -x negate i32 1`] = `
 "
-  (call $__begin__)"
+  (i32.mul 
+    (i32.const -1) 
+    (i32.const 1))"
 `;
 
 exports[`compile -x negate f32 1`] = `
 "
-  (call $__begin__)"
+  (f32.mul 
+    (f32.const -1) 
+    (f32.const 1.0))"
 `;
 
 exports[`compile -x negate bool 1`] = `
 "
-  (call $__begin__)"
+  (i32.mul 
+    (i32.const -1) 
+    (i32.eqz 
+      (i32.const 1)))"
 `;
 
 exports[`compile function declaration with arg default literal 1`] = `
@@ -463,17 +484,23 @@ exports[`compile function declaration with expression referencing variables 1`] 
 Array [
   Object {
     "default": Array [
-      "i32.div_s",
+      "f32.div",
       Array [
-        "global.get",
-        "$x",
+        "f32.convert_i32_s",
+        Array [
+          "global.get",
+          "$x",
+        ],
       ],
       Array [
-        "i32.const",
-        Token {
-          "0": "2",
-          "group": "num",
-        },
+        "f32.convert_i32_s",
+        Array [
+          "i32.const",
+          Token {
+            "0": "2",
+            "group": "num",
+          },
+        ],
       ],
     ],
     "id": Token {
@@ -482,42 +509,54 @@ Array [
     },
     "range": Array [
       Array [
-        "i32.const",
-        Token {
-          "0": "1",
-          "group": "num",
-        },
+        "f32.convert_i32_s",
+        Array [
+          "i32.const",
+          Token {
+            "0": "1",
+            "group": "num",
+          },
+        ],
       ],
       Array [
-        "i32.const",
-        Token {
-          "0": "2",
-          "group": "num",
-        },
+        "f32.convert_i32_s",
+        Array [
+          "i32.const",
+          Token {
+            "0": "2",
+            "group": "num",
+          },
+        ],
       ],
     ],
-    "type": "i32",
+    "type": "f32",
   },
 ]
 `;
 
-exports[`compile function declaration with expression referencing variables 2`] = `"(start $__start__) (global $x (mut i32) (i32.const 0)) (func $__begin__ (export \\"__begin__\\") (global.set $x (i32.const 10))) (func $__start__ (export \\"__start__\\") (call $__begin__)) (func $a (export \\"a\\") (param $b i32) (result i32) (i32.const 1)) (func $f (export \\"f\\") (result i32) (call $a (i32.div_s (global.get $x) (i32.const 2))))"`;
+exports[`compile function declaration with expression referencing variables 2`] = `"(start $__start__) (global $x (mut i32) (i32.const 0)) (func $__begin__ (export \\"__begin__\\") (global.set $x (i32.const 10))) (func $__start__ (export \\"__start__\\") (call $__begin__)) (func $a (export \\"a\\") (param $b f32) (result i32) (i32.const 1)) (func $f (export \\"f\\") (result i32) (call $a (f32.div (f32.convert_i32_s (global.get $x)) (f32.convert_i32_s (i32.const 2)))))"`;
 
 exports[`compile function declaration with range referencing variables 1`] = `
 Array [
   Object {
     "default": Array [
-      "i32.div_s",
+      "f32.div",
       Array [
-        "global.get",
-        "$x",
+        "f32.convert_i32_s",
+        Array [
+          "global.get",
+          "$x",
+        ],
       ],
       Array [
-        "i32.const",
-        Token {
-          "0": "2",
-          "group": "num",
-        },
+        "f32.convert_i32_s",
+        Array [
+          "i32.const",
+          Token {
+            "0": "2",
+            "group": "num",
+          },
+        ],
       ],
     ],
     "id": Token {
@@ -526,23 +565,29 @@ Array [
     },
     "range": Array [
       Array [
-        "i32.const",
-        Token {
-          "0": "1",
-          "group": "num",
-        },
+        "f32.convert_i32_s",
+        Array [
+          "i32.const",
+          Token {
+            "0": "1",
+            "group": "num",
+          },
+        ],
       ],
       Array [
-        "global.get",
-        "$x",
+        "f32.convert_i32_s",
+        Array [
+          "global.get",
+          "$x",
+        ],
       ],
     ],
-    "type": "i32",
+    "type": "f32",
   },
 ]
 `;
 
-exports[`compile function declaration with range referencing variables 2`] = `"(start $__start__) (global $x (mut i32) (i32.const 0)) (func $__begin__ (export \\"__begin__\\") (global.set $x (i32.const 10))) (func $__start__ (export \\"__start__\\") (call $__begin__)) (func $a (export \\"a\\") (param $b i32) (result i32) (i32.const 1)) (func $f (export \\"f\\") (result i32) (call $a (i32.div_s (global.get $x) (i32.const 2))))"`;
+exports[`compile function declaration with range referencing variables 2`] = `"(start $__start__) (global $x (mut i32) (i32.const 0)) (func $__begin__ (export \\"__begin__\\") (global.set $x (i32.const 10))) (func $__start__ (export \\"__start__\\") (call $__begin__)) (func $a (export \\"a\\") (param $b f32) (result i32) (i32.const 1)) (func $f (export \\"f\\") (result i32) (call $a (f32.div (f32.convert_i32_s (global.get $x)) (f32.convert_i32_s (i32.const 2)))))"`;
 
 exports[`compile function declaration with arg default expression 1`] = `
 Array [
@@ -575,17 +620,25 @@ Array [
 
 exports[`compile assignment global 1`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (i32.const 1))"
 `;
 
 exports[`compile assignment global 2`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (i32.const 1)) 
+  (global.set $b 
+    (i32.const 2))"
 `;
 
 exports[`compile assignment multi value 1`] = `
 "
-  (call $__begin__)"
+
+    (global.set $a 
+      (i32.const 1)) 
+    (global.set $b 
+      (i32.const 2))"
 `;
 
 exports[`compile assignment local 1`] = `
@@ -605,8 +658,9 @@ exports[`compile assignment find scope 1`] = `
 exports[`compile parameters 1`] = `
 "
   (local.set $a 
-    (f32.convert_i32_u 
-      (i32.const 1)))"
+    (call $denan 
+      (f32.convert_i32_u 
+        (i32.const 1))))"
 `;
 
 exports[`compile parameters shadow globals 1`] = `
@@ -618,53 +672,66 @@ exports[`compile parameters shadow globals 1`] = `
 exports[`compile parameters shadow globals 2`] = `
 "
   (local.set $a 
-    (f32.convert_i32_s 
-      (i32.const 2)))"
+    (call $denan 
+      (f32.convert_i32_s 
+        (i32.const 2))))"
 `;
 
 exports[`compile function call 1`] = `
 "
-  (call $__begin__)"
+  (call $a)"
 `;
 
 exports[`compile function call 2`] = `
 "
-  (call $__begin__)"
+  (call $a 
+    (f32.convert_i32_u 
+      (i32.const 1)) 
+    (f32.convert_i32_s 
+      (i32.const 2)))"
 `;
 
 exports[`compile function call 3`] = `
 "
-  (call $__begin__)"
+  (call $a)"
 `;
 
 exports[`compile function call 4`] = `
 "
-  (call $__begin__)"
+  (call $a 
+    (f32.const 1.0))"
 `;
 
 exports[`compile function call arg missing use default 1`] = `
 "
-  (call $__begin__)"
+  (call $a 
+    (i32.const 1))"
 `;
 
 exports[`compile function call arg missing use default 2`] = `
 "
-  (call $__begin__)"
+  (call $a 
+    (f32.const 1.5))"
 `;
 
 exports[`compile function call arg missing no default, use argument range 1`] = `
 "
-  (call $__begin__)"
+  (call $a 
+    (i32.const 1))"
 `;
 
 exports[`compile function call arg passed, use argument range for type cast 1`] = `
 "
-  (call $__begin__)"
+  (call $a 
+    (f32.convert_i32_u 
+      (i32.const 1)))"
 `;
 
 exports[`compile variable get global 1`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (i32.const 1)) 
+  (global.get $a)"
 `;
 
 exports[`compile variable get local 1`] = `
@@ -688,312 +755,646 @@ exports[`compile parameter shadow global variable 1`] = `
 
 exports[`compile x?y:z ternary 1`] = `
 "
-  (call $__begin__)"
+  (select 
+    (i32.const 1) 
+    (i32.const 2) 
+    (i32.const 0))"
 `;
 
 exports[`compile x?y:z ternary 2`] = `
 "
-  (call $__begin__)"
+  (select 
+    (i32.const 1) 
+    (i32.const 2) 
+    (i32.const 1))"
 `;
 
 exports[`compile x?y:z ternary 3`] = `
 "
-  (call $__begin__)"
+  (select 
+    (f32.const 1.2) 
+    (f32.convert_i32_s 
+      (i32.const 2)) 
+    (i32.const 1))"
 `;
 
 exports[`compile x?y:z ternary 4`] = `
 "
-  (call $__begin__)"
+  (select 
+    (f32.const 1.2) 
+    (f32.convert_i32_s 
+      (i32.const 2)) 
+    (f32.const 1.5))"
 `;
 
 exports[`compile x%y modulo 1`] = `
 "
-  (call $__begin__)"
+  (i32.rem_u 
+    (i32.const 1) 
+    (i32.const 2))"
 `;
 
 exports[`compile x%y modulo 2`] = `
 "
-  (call $__begin__)"
+  (i32.rem_s 
+    (i32.const 0) 
+    (i32.const 1))"
 `;
 
 exports[`compile x%y modulo 3`] = `
 "
-  (call $__begin__)"
+  (call $mod 
+    (f32.const 1.2) 
+    (f32.convert_i32_u 
+      (i32.const 1)))"
 `;
 
 exports[`compile x%y modulo 4`] = `
 "
-  (call $__begin__)"
+  (call $mod 
+    (f32.const 1.2) 
+    (f32.convert_i32_s 
+      (i32.const 2)))"
 `;
 
 exports[`compile x<<y bitwise shift left 1`] = `
 "
-  (call $__begin__)"
+  (i32.shl 
+    (i32.const 1) 
+    (i32.const 2))"
 `;
 
 exports[`compile x<<y bitwise shift left 2`] = `
 "
-  (call $__begin__)"
+  (i32.shl 
+    (i32.trunc_f32_s 
+      (f32.const 1.2)) 
+    (i32.const 2))"
 `;
 
 exports[`compile x>>y bitwise shift right 1`] = `
 "
-  (call $__begin__)"
+  (i32.shr_s 
+    (i32.const 1) 
+    (i32.const 2))"
 `;
 
 exports[`compile x>>y bitwise shift right 2`] = `
 "
-  (call $__begin__)"
+  (i32.shr_s 
+    (i32.trunc_f32_s 
+      (f32.const 1.2)) 
+    (i32.const 2))"
 `;
 
 exports[`compile x&y bitwise AND 1`] = `
 "
-  (call $__begin__)"
+  (i32.and 
+    (i32.const 1) 
+    (i32.const 2))"
 `;
 
 exports[`compile x&y bitwise AND 2`] = `
 "
-  (call $__begin__)"
+  (i32.and 
+    (i32.trunc_f32_s 
+      (f32.const 1.2)) 
+    (i32.const 2))"
+`;
+
+exports[`compile x^y bitwise XOR 1`] = `
+"
+  (i32.xor 
+    (i32.const 1) 
+    (i32.const 2))"
+`;
+
+exports[`compile x^y bitwise XOR 2`] = `
+"
+  (i32.xor 
+    (i32.trunc_f32_s 
+      (f32.const 1.2)) 
+    (i32.const 2))"
 `;
 
 exports[`compile x|y bitwise OR 1`] = `
 "
-  (call $__begin__)"
+  (i32.or 
+    (i32.const 1) 
+    (i32.const 2))"
 `;
 
 exports[`compile x|y bitwise OR 2`] = `
 "
-  (call $__begin__)"
+  (i32.or 
+    (i32.trunc_f32_s 
+      (f32.const 1.2)) 
+    (i32.const 2))"
 `;
 
 exports[`compile ~y bitwise NOT 1`] = `
 "
-  (call $__begin__)"
+  (i32.not 
+    (i32.const 1))"
 `;
 
 exports[`compile ~y bitwise NOT 2`] = `
 "
-  (call $__begin__)"
+  (i32.not 
+    (i32.trunc_f32_s 
+      (f32.const 1.2)))"
 `;
 
 exports[`compile x&&y logical And 1`] = `
 "
-  (call $__begin__)"
+  (select 
+    (i32.const 2) 
+    (i32.const 0) 
+    (i32.ne 
+      (i32.const 0) 
+      (i32.const 1)))"
 `;
 
 exports[`compile x&&y logical And 2`] = `
 "
-  (call $__begin__)"
+  (select 
+    (select 
+      (i32.const 3) 
+      (i32.const 0) 
+      (i32.ne 
+        (i32.const 0) 
+        (i32.const 2))) 
+    (i32.const 0) 
+    (i32.ne 
+      (i32.const 0) 
+      (i32.const 1)))"
 `;
 
 exports[`compile x&&y logical And 3`] = `
 "
-  (call $__begin__)"
+  (select 
+    (select 
+      (i32.const 3) 
+      (i32.const 0) 
+      (f32.ne 
+        (f32.convert_i32_u 
+          (i32.const 0)) 
+        (f32.const 2.5))) 
+    (i32.const 0) 
+    (i32.ne 
+      (i32.const 0) 
+      (i32.const 1)))"
 `;
 
 exports[`compile x||y logical Or 1`] = `
 "
-  (call $__begin__)"
+  (if 
+    (result i32) 
+    (i32.ne 
+      (i32.const 0) 
+      (local.tee __lhs__i32 
+        (i32.const 1))) 
+    (then 
+      (local.get __lhs__i32)) 
+    (else 
+      (i32.const 2)))"
 `;
 
 exports[`compile x||y logical Or 2`] = `
 "
-  (call $__begin__)"
+  (if 
+    (result i32) 
+    (i32.ne 
+      (i32.const 0) 
+      (local.tee __lhs__i32 
+        (i32.const 1))) 
+    (then 
+      (local.get __lhs__i32)) 
+    (else 
+      (if 
+        (result i32) 
+        (i32.ne 
+          (i32.const 0) 
+          (local.tee __lhs__i32 
+            (i32.const 2))) 
+        (then 
+          (local.get __lhs__i32)) 
+        (else 
+          (i32.const 3)))))"
 `;
 
 exports[`compile x||y logical Or 3`] = `
 "
-  (call $__begin__)"
+  (if 
+    (result f32) 
+    (f32.ne 
+      (f32.const 0) 
+      (local.tee __lhs__f32 
+        (f32.convert_i32_u 
+          (i32.const 1)))) 
+    (then 
+      (local.get __lhs__f32)) 
+    (else 
+      (if 
+        (result f32) 
+        (f32.ne 
+          (f32.const 0) 
+          (local.tee __lhs__f32 
+            (f32.const 2.5))) 
+        (then 
+          (local.get __lhs__f32)) 
+        (else 
+          (f32.convert_i32_s 
+            (i32.const 3))))))"
 `;
 
 exports[`compile x==y equality 1`] = `
 "
-  (call $__begin__)"
+  (i32.eq 
+    (i32.const 1) 
+    (i32.const 2))"
 `;
 
 exports[`compile x==y equality 2`] = `
 "
-  (call $__begin__)"
+  (f32.eq 
+    (f32.const 1.2) 
+    (f32.const 2.2))"
 `;
 
 exports[`compile x!=y non-equality 1`] = `
 "
-  (call $__begin__)"
+  (i32.ne 
+    (i32.const 1) 
+    (i32.const 2))"
 `;
 
 exports[`compile x!=y non-equality 2`] = `
 "
-  (call $__begin__)"
+  (f32.ne 
+    (f32.const 1.2) 
+    (f32.const 2.2))"
 `;
 
 exports[`compile x<y less than 1`] = `
 "
-  (call $__begin__)"
+  (i32.lt_s 
+    (i32.const 1) 
+    (i32.const 2))"
 `;
 
 exports[`compile x<y less than 2`] = `
 "
-  (call $__begin__)"
+  (f32.lt 
+    (f32.const 1.2) 
+    (f32.const 2.2))"
 `;
 
 exports[`compile x>y greater than 1`] = `
 "
-  (call $__begin__)"
+  (i32.gt_s 
+    (i32.const 1) 
+    (i32.const 2))"
 `;
 
 exports[`compile x>y greater than 2`] = `
 "
-  (call $__begin__)"
+  (f32.gt 
+    (f32.const 1.2) 
+    (f32.const 2.2))"
 `;
 
 exports[`compile x<=y less than or equal 1`] = `
 "
-  (call $__begin__)"
+  (i32.le_s 
+    (i32.const 1) 
+    (i32.const 2))"
 `;
 
 exports[`compile x<=y less than or equal 2`] = `
 "
-  (call $__begin__)"
+  (f32.le 
+    (f32.const 1.2) 
+    (f32.const 2.2))"
 `;
 
 exports[`compile x>=y greater than or equal 1`] = `
 "
-  (call $__begin__)"
+  (i32.ge_s 
+    (i32.const 1) 
+    (i32.const 2))"
 `;
 
 exports[`compile x>=y greater than or equal 2`] = `
 "
-  (call $__begin__)"
+  (f32.ge 
+    (f32.const 1.2) 
+    (f32.const 2.2))"
 `;
 
 exports[`compile x+=y variable add 1`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (i32.const 1)) 
+  (global.set $a 
+    (i32.add 
+      (global.get $a) 
+      (i32.const 1)))"
 `;
 
 exports[`compile x+=y variable add 2`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (call $denan 
+      (f32.const 1.5))) 
+  (global.set $a 
+    (call $denan 
+      (f32.add 
+        (global.get $a) 
+        (f32.const 2.5))))"
 `;
 
 exports[`compile x-=y variable sub 1`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (i32.const 1)) 
+  (global.set $a 
+    (i32.sub 
+      (global.get $a) 
+      (i32.const 1)))"
 `;
 
 exports[`compile x-=y variable sub 2`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (call $denan 
+      (f32.const 1.5))) 
+  (global.set $a 
+    (call $denan 
+      (f32.sub 
+        (global.get $a) 
+        (f32.const 2.5))))"
 `;
 
 exports[`compile x*=y variable mul 1`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (i32.const 1)) 
+  (global.set $a 
+    (i32.mul 
+      (global.get $a) 
+      (i32.const 1)))"
 `;
 
 exports[`compile x*=y variable mul 2`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (call $denan 
+      (f32.const 1.5))) 
+  (global.set $a 
+    (call $denan 
+      (f32.mul 
+        (global.get $a) 
+        (f32.const 2.5))))"
 `;
 
 exports[`compile x/=y variable div 1`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (i32.const 1)) 
+  (global.set $a 
+    (i32.trunc_f32_u 
+      (f32.div 
+        (f32.convert_i32_u 
+          (global.get $a)) 
+        (f32.convert_i32_u 
+          (i32.const 1)))))"
 `;
 
 exports[`compile x/=y variable div 2`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (call $denan 
+      (f32.const 1.5))) 
+  (global.set $a 
+    (call $denan 
+      (f32.div 
+        (global.get $a) 
+        (f32.const 2.5))))"
 `;
 
 exports[`compile x%=y variable mod 1`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (i32.const 1)) 
+  (global.set $a 
+    (i32.rem_s 
+      (global.get $a) 
+      (i32.const 1)))"
 `;
 
 exports[`compile x%=y variable mod 2`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (call $denan 
+      (f32.const 1.5))) 
+  (global.set $a 
+    (call $denan 
+      (call $mod 
+        (global.get $a) 
+        (f32.const 2.5))))"
 `;
 
 exports[`compile x<<=y variable shift left 1`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (i32.const 1)) 
+  (global.set $a 
+    (i32.shl 
+      (global.get $a) 
+      (i32.const 1)))"
 `;
 
 exports[`compile x<<=y variable shift left 2`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (call $denan 
+      (f32.const 1.5))) 
+  (global.set $a 
+    (call $denan 
+      (f32.convert_i32_s 
+        (i32.shl 
+          (i32.trunc_f32_s 
+            (global.get $a)) 
+          (i32.trunc_f32_s 
+            (f32.const 2.5))))))"
 `;
 
 exports[`compile x>>=y variable shift right 1`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (i32.const 1)) 
+  (global.set $a 
+    (i32.shr_s 
+      (global.get $a) 
+      (i32.const 1)))"
 `;
 
 exports[`compile x>>=y variable shift right 2`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (call $denan 
+      (f32.const 1.5))) 
+  (global.set $a 
+    (call $denan 
+      (f32.convert_i32_s 
+        (i32.shr_s 
+          (i32.trunc_f32_s 
+            (global.get $a)) 
+          (i32.trunc_f32_s 
+            (f32.const 2.5))))))"
 `;
 
 exports[`compile x&=y variable bitwise AND 1`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (i32.const 1)) 
+  (global.set $a 
+    (i32.and 
+      (global.get $a) 
+      (i32.const 1)))"
 `;
 
 exports[`compile x&=y variable bitwise AND 2`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (call $denan 
+      (f32.const 1.5))) 
+  (global.set $a 
+    (call $denan 
+      (f32.convert_i32_s 
+        (i32.and 
+          (i32.trunc_f32_s 
+            (global.get $a)) 
+          (i32.trunc_f32_s 
+            (f32.const 2.5))))))"
 `;
 
 exports[`compile x|=y variable bitwise OR 1`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (i32.const 1)) 
+  (global.set $a 
+    (i32.or 
+      (global.get $a) 
+      (i32.const 1)))"
 `;
 
 exports[`compile x|=y variable bitwise OR 2`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (call $denan 
+      (f32.const 1.5))) 
+  (global.set $a 
+    (call $denan 
+      (f32.convert_i32_s 
+        (i32.or 
+          (i32.trunc_f32_s 
+            (global.get $a)) 
+          (i32.trunc_f32_s 
+            (f32.const 2.5))))))"
 `;
 
 exports[`compile ++x variable add 1 pre 1`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (i32.const 1)) 
+  (global.set $a 
+    (i32.add 
+      (global.get $a) 
+      (i32.const 1)))"
 `;
 
 exports[`compile ++x variable add 1 pre 2`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (call $denan 
+      (f32.const 1.5))) 
+  (global.set $a 
+    (call $denan 
+      (f32.add 
+        (global.get $a) 
+        (f32.convert_i32_u 
+          (i32.const 1)))))"
 `;
 
 exports[`compile x++ variable add 1 post 1`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (i32.const 1)) 
+  (global.set $a 
+    (i32.add 
+      (global.get $a) 
+      (i32.const 1)))"
 `;
 
 exports[`compile x++ variable add 1 post 2`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (call $denan 
+      (f32.const 1.5))) 
+  (global.set $a 
+    (call $denan 
+      (f32.add 
+        (global.get $a) 
+        (f32.convert_i32_u 
+          (i32.const 1)))))"
 `;
 
 exports[`compile --x variable sub 1 pre 1`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (i32.const 1)) 
+  (global.set $a 
+    (i32.sub 
+      (global.get $a) 
+      (i32.const 1)))"
 `;
 
 exports[`compile --x variable sub 1 pre 2`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (call $denan 
+      (f32.const 1.5))) 
+  (global.set $a 
+    (call $denan 
+      (f32.sub 
+        (global.get $a) 
+        (f32.convert_i32_u 
+          (i32.const 1)))))"
 `;
 
 exports[`compile x-- variable sub 1 post 1`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (i32.const 1)) 
+  (global.set $a 
+    (i32.sub 
+      (global.get $a) 
+      (i32.const 1)))"
 `;
 
 exports[`compile x-- variable sub 1 post 2`] = `
 "
-  (call $__begin__)"
+  (global.set $a 
+    (call $denan 
+      (f32.const 1.5))) 
+  (global.set $a 
+    (call $denan 
+      (f32.sub 
+        (global.get $a) 
+        (f32.convert_i32_u 
+          (i32.const 1)))))"
 `;
 
 exports[`compile load operations 1`] = `
@@ -1121,17 +1522,74 @@ exports[`compile buffer allocate 1`] = `
 
 exports[`compile buffer allocate 2`] = `
 "
-  (call $__begin__)"
+
+    (global.set $# 
+      (global.get $global_mem_ptr)) 
+    (global.set $#_size 
+      (i32.const 4)) 
+    (global.set $#_length 
+      (i32.shl 
+        (i32.mul 
+          (global.get $#_size) 
+          (i32.const 2)) 
+        (i32.const 2))) 
+    (global.set $#_needle 
+      (i32.load 
+        (global.get $#))) 
+    (global.set $global_mem_ptr 
+      (i32.add 
+        (global.get $global_mem_ptr) 
+        (i32.add 
+          (i32.const 4) 
+          (global.get $#_length))))"
 `;
 
 exports[`compile buffer allocate 3`] = `
 "
-  (call $__begin__)"
+
+    (global.set $#foo 
+      (global.get $global_mem_ptr)) 
+    (global.set $#foo_size 
+      (i32.const 4)) 
+    (global.set $#foo_length 
+      (i32.shl 
+        (i32.mul 
+          (global.get $#foo_size) 
+          (i32.const 2)) 
+        (i32.const 2))) 
+    (global.set $#foo_needle 
+      (i32.load 
+        (global.get $#foo))) 
+    (global.set $global_mem_ptr 
+      (i32.add 
+        (global.get $global_mem_ptr) 
+        (i32.add 
+          (i32.const 4) 
+          (global.get $#foo_length))))"
 `;
 
 exports[`compile buffer allocate 4`] = `
 "
-  (call $__begin__)"
+
+    (global.set $# 
+      (global.get $global_mem_ptr)) 
+    (global.set $#_size 
+      (i32.const 4)) 
+    (global.set $#_length 
+      (i32.shl 
+        (i32.mul 
+          (global.get $#_size) 
+          (i32.const 1)) 
+        (i32.const 2))) 
+    (global.set $#_needle 
+      (i32.load 
+        (global.get $#))) 
+    (global.set $global_mem_ptr 
+      (i32.add 
+        (global.get $global_mem_ptr) 
+        (i32.add 
+          (i32.const 4) 
+          (global.get $#_length))))"
 `;
 
 exports[`compile buffer allocate 5`] = `
@@ -1250,8 +1708,9 @@ exports[`compile buffer negative index read 1`] = `
                 (local.get $#_length)))))) 
       (f32.store offset=4 
         (local.get $temp_buffer_pos) 
-        (f32.convert_i32_s 
-          (i32.const 42))) 
+        (call $denan 
+          (f32.convert_i32_s 
+            (i32.const 42)))) 
       (local.set $#_needle 
         (i32.add 
           (i32.const 1) 
@@ -1317,11 +1776,13 @@ exports[`compile buffer read tuple 1`] = `
             (f32.convert_i32_s 
               (local.get $#_length)))))) 
     (local.set $a 
-      (f32.load offset=4 
-        (local.get $temp_buffer_pos))) 
+      (call $denan 
+        (f32.load offset=4 
+          (local.get $temp_buffer_pos)))) 
     (local.set $b 
-      (f32.load offset=8 
-        (local.get $temp_buffer_pos)))"
+      (call $denan 
+        (f32.load offset=8 
+          (local.get $temp_buffer_pos))))"
 `;
 
 exports[`compile buffer read tuple 2`] = `
@@ -1363,11 +1824,13 @@ exports[`compile buffer read tuple 2`] = `
             (f32.convert_i32_s 
               (local.get $#_length)))))) 
     (local.set $a 
-      (f32.load offset=4 
-        (local.get $temp_buffer_pos))) 
+      (call $denan 
+        (f32.load offset=4 
+          (local.get $temp_buffer_pos)))) 
     (local.set $b 
-      (f32.load offset=8 
-        (local.get $temp_buffer_pos)))"
+      (call $denan 
+        (f32.load offset=8 
+          (local.get $temp_buffer_pos))))"
 `;
 
 exports[`compile buffer write 1`] = `
@@ -1408,8 +1871,9 @@ exports[`compile buffer write 1`] = `
               (local.get $#_length)))))) 
     (f32.store offset=4 
       (local.get $temp_buffer_pos) 
-      (f32.convert_i32_s 
-        (i32.const 2))) 
+      (call $denan 
+        (f32.convert_i32_s 
+          (i32.const 2)))) 
     (local.set $#_needle 
       (i32.add 
         (i32.const 1) 
@@ -1457,12 +1921,14 @@ exports[`compile buffer write tuple 1`] = `
               (local.get $#_length)))))) 
     (f32.store offset=4 
       (local.get $temp_buffer_pos) 
-      (f32.convert_i32_s 
-        (i32.const 2))) 
+      (call $denan 
+        (f32.convert_i32_s 
+          (i32.const 2)))) 
     (f32.store offset=8 
       (local.get $temp_buffer_pos) 
-      (f32.convert_i32_s 
-        (i32.const 3))) 
+      (call $denan 
+        (f32.convert_i32_s 
+          (i32.const 3)))) 
     (local.set $#_needle 
       (i32.add 
         (i32.const 1) 
@@ -1510,12 +1976,14 @@ exports[`compile buffer map/call/reduce 1`] = `
               (local.get $#_length)))))) 
     (f32.store offset=4 
       (local.get $temp_buffer_pos) 
-      (f32.convert_i32_s 
-        (i32.const 2))) 
+      (call $denan 
+        (f32.convert_i32_s 
+          (i32.const 2)))) 
     (f32.store offset=8 
       (local.get $temp_buffer_pos) 
-      (f32.convert_i32_s 
-        (i32.const 3))) 
+      (call $denan 
+        (f32.convert_i32_s 
+          (i32.const 3)))) 
     (local.set $#_needle 
       (i32.add 
         (i32.const 1) 
@@ -1523,39 +1991,42 @@ exports[`compile buffer map/call/reduce 1`] = `
     (i32.store 
       (local.get $#) 
       (local.get $#_needle)) 
+  (f32.mul 
 
-    (local.set $temp_index 
-      (i32.const 0)) 
-    (local.set $temp_sum 
-      (f32.const 0)) 
-    (local.set $temp_buffer_pos 
-      (local.get $#)) 
-    (local.set $temp_buffer_one_index_length 
-      (i32.shl 
-        (i32.const 2) 
-        (i32.const 2))) 
-    (loop $loop 
-      (local.set $temp_sum 
-        (f32.add 
-          (local.get $temp_sum) 
-          (call $add 
-            (f32.load offset=4 
-              (local.get $temp_buffer_pos)) 
-            (f32.load offset=8 
-              (local.get $temp_buffer_pos))))) 
-      (local.set $temp_buffer_pos 
-        (i32.add 
-          (local.get $temp_buffer_pos) 
-          (local.get $temp_buffer_one_index_length))) 
       (local.set $temp_index 
-        (i32.add 
-          (local.get $temp_index) 
-          (i32.const 1))) 
-      (br_if $loop 
-        (i32.ne 
-          (local.get $temp_index) 
-          (local.get $#_size)))) 
-    (local.get $temp_sum)"
+        (i32.const 0)) 
+      (local.set $temp_sum 
+        (f32.const 0)) 
+      (local.set $temp_buffer_pos 
+        (local.get $#)) 
+      (local.set $temp_buffer_one_index_length 
+        (i32.shl 
+          (i32.const 2) 
+          (i32.const 2))) 
+      (loop $loop 
+        (local.set $temp_sum 
+          (f32.add 
+            (local.get $temp_sum) 
+            (call $add 
+              (f32.load offset=4 
+                (local.get $temp_buffer_pos)) 
+              (f32.load offset=8 
+                (local.get $temp_buffer_pos))))) 
+        (local.set $temp_buffer_pos 
+          (i32.add 
+            (local.get $temp_buffer_pos) 
+            (local.get $temp_buffer_one_index_length))) 
+        (local.set $temp_index 
+          (i32.add 
+            (local.get $temp_index) 
+            (i32.const 1))) 
+        (br_if $loop 
+          (i32.ne 
+            (local.get $temp_index) 
+            (local.get $#_size)))) 
+      (local.get $temp_sum) 
+    (f32.convert_i32_s 
+      (i32.const 555)))"
 `;
 
 exports[`compile buffer function with internal buffer 1`] = `
@@ -1596,21 +2067,22 @@ exports[`compile buffer function with internal buffer 1`] = `
             (i32.const 4) 
             (local.get $#_length)))) 
     (local.set $y 
-      (f32.load offset=4 
-        (i32.add 
-          (local.get $#) 
-          (i32.trunc_f32_s 
-            (call $modwrap 
-              (f32.convert_i32_s 
-                (i32.shl 
-                  (i32.mul 
-                    (i32.add 
-                      (i32.const 0) 
-                      (local.get $#_needle)) 
-                    (i32.const 1)) 
-                  (i32.const 2))) 
-              (f32.convert_i32_s 
-                (local.get $#_length))))))) 
+      (call $denan 
+        (f32.load offset=4 
+          (i32.add 
+            (local.get $#) 
+            (i32.trunc_f32_s 
+              (call $modwrap 
+                (f32.convert_i32_s 
+                  (i32.shl 
+                    (i32.mul 
+                      (i32.add 
+                        (i32.const 0) 
+                        (local.get $#_needle)) 
+                      (i32.const 1)) 
+                    (i32.const 2))) 
+                (f32.convert_i32_s 
+                  (local.get $#_length)))))))) 
 
       (local.set $temp_buffer_pos 
         (i32.add 
@@ -1627,8 +2099,9 @@ exports[`compile buffer function with internal buffer 1`] = `
                 (local.get $#_length)))))) 
       (f32.store offset=4 
         (local.get $temp_buffer_pos) 
-        (f32.convert_i32_u 
-          (i32.const 1))) 
+        (call $denan 
+          (f32.convert_i32_u 
+            (i32.const 1)))) 
       (local.set $#_needle 
         (i32.add 
           (i32.const 1) 

@@ -6,7 +6,7 @@ import { S, S0 } from '../src/sexpr'
 // const deepToString = (x: string | SExpr): string | SExpr => (Array.isArray(x) ? x.map(deepToString) : '' + x)
 // const func = (sym: string, s: string) => deepToString([...compile(parse(s)).funcs[sym].body!])
 const fc = (sym: string, s: string, global?: any) => S(compile(parse(s), global).funcs[sym].body!)
-const c = (s: string, global?: any) => fc('__start__', s, global)
+const c = (s: string, global?: any) => fc('__begin__', s, global)
 const bodyOf = (s: string) => S(compile(parse(s)).body)
 
 describe('compile', () => {
@@ -22,7 +22,7 @@ describe('compile', () => {
     expect(c('1+2')).toMatchSnapshot()
   })
 
-  it('x+y add op', () => {
+  it('x+y add op float', () => {
     expect(c('1.5+1')).toMatchSnapshot()
   })
 
@@ -256,10 +256,10 @@ describe('compile', () => {
     expect(c('1.2&2')).toMatchSnapshot()
   })
 
-  // it('x^y bitwise XOR', () => {
-  //   expect(c('1^2')).toMatchSnapshot()
-  //   expect(c('1.2^2')).toMatchSnapshot()
-  // })
+  it('x^y bitwise XOR', () => {
+    expect(c('1^2')).toMatchSnapshot()
+    expect(c('1.2^2')).toMatchSnapshot()
+  })
 
   it('x|y bitwise OR', () => {
     expect(c('1|2')).toMatchSnapshot()
@@ -429,7 +429,7 @@ describe('compile', () => {
 
     it('map/call/reduce', () => {
       expect(() => fc('f', 'add(a,b)=(a+b);f()=(#:4,2;#=(2,3);foo::add)')).toThrow('must be a buffer')
-      expect(fc('f', 'add(a,b)=(a+b);f()=(#:4,2;#=(2,3);#::add)')).toMatchSnapshot()
+      expect(fc('f', 'add(a,b)=(a+b);f()=(#:4,2;#=(2,3);#::add*555)')).toMatchSnapshot()
     })
 
     it('function with internal buffer', () => {
