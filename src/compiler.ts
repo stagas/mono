@@ -221,6 +221,9 @@ export const compile = (node: Node, scope: Scope = {}, includes: Includes = {}, 
 
   /** function call */
   const funcCall = (sym: Token, args: SExpr[]) => {
+    if (Array.isArray(sym))
+      throw new CompilerError(new CompilerErrorCauses.TypeErrorCause(sym[0], 'invalid function passed to map/reduce'))
+
     const func = funcs[sym]
     if (!func) throw new CompilerError(new CompilerErrorCauses.ReferenceErrorCause(sym, 'function not defined'))
     // console.log('CALLING', sym, 'TYPE', body, type)

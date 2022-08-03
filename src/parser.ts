@@ -73,7 +73,6 @@ export const Parse = createParser(
       '..': [[2, 2], { led: bin }],
 
       ':': [[3, 1], { led: bin }],
-      '::': [[3, 2], { led: bin }],
       '=': [[3, 3], { led: bin }],
       '+=': [[3, 2], { led: varbin('+') }],
       '-=': [[3, 2], { led: varbin('-') }],
@@ -150,6 +149,7 @@ export const Parse = createParser(
         led: until(')', 0, (t, L, R) => [t.as('@'), L, R].filter(Boolean)),
         nud: until(')', 0, (_, __, x) => x),
       }],
+      '::': [[17, 16], { led: bin }],
     }
   }
 )
