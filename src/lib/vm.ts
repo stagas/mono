@@ -39,6 +39,7 @@ export const fill = ({ type, params }: { type: Type; params: Arg[] }) =>
     ;; ...params
     ${params.map(x => `(param $${x.id} ${max(Type.i32, x.type!)})`).join(' ')}
 
+    (local $sample f32)
     (local $sample_time f32)
 
     (local.set $sample_time
@@ -63,12 +64,27 @@ export const fill = ({ type, params }: { type: Type; params: Arg[] }) =>
       ;; run initializers
       (call $__begin__)
 
-      ;; buffer[$offset] =
-      (f32.store (i32.shl (local.get $offset) (i32.const 2))
-        ;; f(...params)
+      ;; $sample = f(...params)
+      (local.set $sample
         ${W(type) < W(Type.f32) ? '(f32.convert_i32_s ' : ''}
         (call $f ${params.map(x => `(local.get $${x.id})`).join(' ')})
         ${W(type) < W(Type.f32) ? ')' : ''}
+      )
+
+      ;; buffer[$offset] =
+      (f32.store (i32.shl (local.get $offset) (i32.const 2))
+        ;; if $sample is finite return $sample else return 0
+        (select
+          (local.get $sample)
+          (f32.const 0)
+          (f32.eq
+            (f32.const 0)
+            (f32.sub
+              (local.get $sample)
+              (local.get $sample)
+            )
+          )
+        )
       )
 
       ;; $t += $sample_time
