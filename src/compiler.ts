@@ -566,7 +566,7 @@ export const compile = (node: Node, scope: Scope = {}, includes: Includes = {}, 
         'select',
         cast(type, then_body),
         cast(type, else_body),
-        cast(Type.bool, cond),
+        cond,
       ])
     },
 
