@@ -1,3 +1,4 @@
+// @env browser
 import { compile } from '../src/compiler'
 import { parse } from '../src/parser'
 import { S } from '../src/sexpr'

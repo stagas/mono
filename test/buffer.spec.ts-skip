@@ -1,5 +1,6 @@
+// @env browser
 import { S } from '../src/sexpr'
-import { VM } from '../src/vm'
+import { CHANNEL_BYTES, MEM_PADDING, VM } from '../src/vm'
 
 const run = async (code: string) => {
   const vm = new VM()
@@ -15,14 +16,20 @@ const run = async (code: string) => {
     funcs: vm.linker.module!.funcs,
     a_type,
     a_source,
-    start_type: vm.linker.module!.typeOf(vm.linker.module!.funcs.__start__.body!.at(-1)),
+    start_type: vm.linker.module!.typeOf(
+      vm.linker.module!.funcs.__start__.body!.at(-1)
+    ),
     start_source: S(vm.linker.module!.funcs.__start__.source!),
     f_type: vm.linker.module!.typeOf(vm.linker.module!.funcs.f.body!.at(-1)),
     f_source: S(vm.linker.module!.funcs.f.source!),
     a: vm.exports.a,
+    begin: () => {
+      vm.exports.global_mem_ptr.value = MEM_PADDING + CHANNEL_BYTES
+      vm.exports.__begin__()
+    },
     f: (...params: any) => {
       // simulate start of loop
-      vm.exports.global_mem_ptr.value = 0
+      vm.exports.global_mem_ptr.value = MEM_PADDING + CHANNEL_BYTES
       return vm.exports.f.call(this, ...params)
     },
   }
@@ -66,21 +73,28 @@ describe('buffer', () => {
 
   it('map/reduce', async () => {
     {
-      const m = await run('add(a,b)=(a+b);f()=(#:4,2;#=(2,3);#::add)')
+      const m = await run('add(a,b)=(a+b);f()=(#:4,2;#=(2,3);#::add:sum)')
       expect(m.f()).toEqual(5)
     }
     {
-      const m = await run('add(a,b)=(a+b);f()=(#:4,2;#=(1,2);#=(3,4);#=(5,6);#=(7,8);#::add)')
+      const m = await run(
+        'add(a,b)=(a+b);f()=(#:4,2;#=(1,2);#=(3,4);#=(5,6);#=(7,8);#::add:sum)'
+      )
       expect(m.f()).toEqual(36)
     }
     {
-      const m = await run('add(a,b)=(a+b);f()=(#:4,2;#=(1,2);#=(3,4);#=(5,6);#=(7,8);#=(9,10);#::add)')
+      const m = await run(
+        'add(a,b)=(a+b);f()=(#:4,2;#=(1,2);#=(3,4);#=(5,6);#=(7,8);#=(9,10);#::add:sum)'
+      )
       expect(m.f()).toEqual(52)
     }
   })
 
   it('global tuple', async () => {
-    const m = await run('#:(2,2); a(x,y)=(#=(x,y);0); b(x,y)=(x+y); f()=(#::b)')
+    const m = await run(
+      '#:(2,2); a(x,y)=(#=(x,y);0); b(x,y)=(x+y); f()=(#::b:sum)'
+    )
+    m.begin()
     m.a(1, 1)
     expect(m.f()).toEqual(2)
     m.a(2, 2)

@@ -1,21 +1,24 @@
 // import rfdc from 'rfdc'
 import * as CompilerErrorCauses from './causes'
+import { CtxOp, NodeOp, Op, Ops, OpTable, opTables } from './optables'
 import { Node, Token } from './parser'
-import { SExpr } from './sexpr'
-import { Type, Typed } from './typed'
-import { flatten, mush } from './util'
+// @ts-ignore
+// eslint-disable-next-line
+import { S, SExpr } from './sexpr'
+import { Type, Typed, TypesMap } from './typed'
+import { flatten } from './util'
+
+export { Token }
+export type { Node, SExpr }
 
 export { CompilerErrorCauses }
-// const copy = rfdc({ proto: true, circles: false })
-
-export type { Token }
 
 export interface CompilerError extends Error {
   cause:
-    | CompilerErrorCauses.ReferenceErrorCause
-    | CompilerErrorCauses.SyntaxErrorCause
-    | CompilerErrorCauses.TypeErrorCause
-    | CompilerErrorCauses.InvalidErrorCause
+  | CompilerErrorCauses.ReferenceErrorCause
+  | CompilerErrorCauses.SyntaxErrorCause
+  | CompilerErrorCauses.TypeErrorCause
+  | CompilerErrorCauses.InvalidErrorCause
 }
 
 export class CompilerError extends Error {
@@ -25,72 +28,154 @@ export class CompilerError extends Error {
   }
 }
 
-interface Op {
-  (...sexprs: SExpr[]): SExpr
+export class Struct {
+  static Buffer = {
+    Needle: 0,
+    Current: 1,
+    Size: 2,
+    Size_m1: 3,
+    Length: 4,
+    Contents: 5,
+  } as const
+
+  constructor(public context: Context, public sym: Sym) { }
+
+  read = (type: Type, index: number) => {
+    const { typeAs, cast } = this.context.module
+    return typeAs(type, [
+      `${type}.load offset=${index << 2}`,
+      cast(Type.i32, this.sym.get()),
+    ])
+  }
+
+  write = (type: Type, index: number, value: SExpr) => {
+    const { typeAs, cast, denan } = this.context.module
+    return typeAs(Type.none, [
+      `${type}.store offset=${index << 2}`,
+      cast(Type.i32, this.sym.get()),
+      cast(type, denan(value)),
+    ])
+  }
 }
 
-type CtxOp = TokenOp | NodeOp
+export class Buffer extends Struct {
+  get scope() {
+    return this.context.scope
+  }
 
-interface TokenOp {
-  (local: Context, ops: OpTable): RawTokenOp
+  get pointer() {
+    return this.sym.get()
+  }
+  set_pointer(value: SExpr) {
+    return this.sym.set(value)
+  }
+
+  get needle() {
+    return this.read(Type.i32, Struct.Buffer.Needle)
+  }
+  set_needle(value: SExpr) {
+    return this.write(Type.i32, Struct.Buffer.Needle, value)
+  }
+
+  get current() {
+    return this.read(Type.i32, Struct.Buffer.Current)
+  }
+  set_current(value: SExpr) {
+    return this.write(Type.i32, Struct.Buffer.Current, value)
+  }
+
+  get size() {
+    return this.read(Type.i32, Struct.Buffer.Size)
+  }
+  set_size(value: SExpr) {
+    return this.write(Type.i32, Struct.Buffer.Size, value)
+  }
+
+  get size_m1() {
+    return this.read(Type.i32, Struct.Buffer.Size_m1)
+  }
+  set_size_m1(value: SExpr) {
+    return this.write(Type.i32, Struct.Buffer.Size_m1, value)
+  }
+
+  get elements() {
+    return this.context.get_elements(this.sym) ?? 1
+  }
+  get elements_const() {
+    const { i32 } = this.context.module.ops
+    return i32.const(this.elements)
+  }
+
+  get length() {
+    return this.read(Type.i32, Struct.Buffer.Length)
+  }
+  set_length(value: SExpr) {
+    return this.write(Type.i32, Struct.Buffer.Length, value)
+  }
+
+  write_at = (i: number, val: SExpr) =>
+    this.write(Type.f32, Struct.Buffer.Contents + i, val)
+
+  get_pos = (offset?: SExpr, useNeedle?: boolean) => {
+    const { typeAs, castAll } = this.context.module
+    const { i32 } = this.context.module.ops
+
+    const pos = useNeedle ? this.needle : this.current
+
+    // dprint-ignore
+    return i32.add( // buffer_ptr +
+      this.pointer,
+      typeAs(Type.i32, [
+        'call', '$modwrapi', ...castAll(Type.i32, // %% buffer_length
+          i32.shl( // << 2
+            i32.mul( // (offset+current)*elements
+              offset ? i32.add(offset, pos) : pos,
+              this.elements_const
+            ),
+            i32.const(2)
+          ),
+          this.length
+        )
+      ]),
+    )
+  }
+
+  write_at_pos = (pos: SExpr, elementOffset: number, value: SExpr) => {
+    const { typeAs, cast, denan } = this.context.module
+    return typeAs(Type.none, [
+      `f32.store offset=${(Struct.Buffer.Contents + elementOffset) << 2}`,
+      cast(Type.i32, pos),
+      cast(Type.f32, denan(value)),
+    ])
+  }
+
+  read_at_pos = (pos: SExpr, elementOffset = 0) => {
+    const { typeAs, cast } = this.context.module
+    return typeAs(Type.f32, [
+      `f32.load offset=${(Struct.Buffer.Contents + elementOffset) << 2}`,
+      cast(Type.i32, pos),
+    ])
+  }
+
+  read_at = (pos?: SExpr, elementOffset = 0) => {
+    return this.read_at_pos(this.get_pos(pos), elementOffset)
+  }
 }
 
-interface NodeOp {
-  (local: Context, ops: OpTable): RawNodeOp
-}
-
-interface RawTokenOp {
-  (lhs: Token, ...nodes: Node[]): SExpr
-}
-
-interface RawNodeOp {
-  (...nodes: Node[]): SExpr
-}
-
-interface OpTable {
-  [k: string]: null | (() => CtxOp) | Op | Op[]
-}
-
-export interface Scope {
-  [k: string]: Type
-}
-
-export interface Arg {
-  id: Token
-  type: Type
+export class Arg {
   export?: boolean
   default?: SExpr
   originalDefault?: SExpr
   range?: SExpr
-}
 
-export interface Context {
-  params: Arg[]
-  scope: Scope
-  offsets: Record<string, number>
-  elements: Record<string, Token>
+  constructor(
+    public id: Token & string,
+    public type: Type,
+  ) { }
 }
-
-export interface Func {
-  id: Token
-  params: Arg[]
-  result: Type
-  context: Context
-  body?: SExpr
-  source?: SExpr
-}
-
-// export type Func = [SExpr, SExpr]
 
 export interface Includes {
   [k: string]: Func | { params: Type[]; result: Type }
-}
-
-export interface Module {
-  body: SExpr
-  funcs: Record<string, Func>
-  typeOf: (x: any) => Type
-  valueOf: () => SExpr
 }
 
 export { Type }
@@ -100,148 +185,316 @@ export enum CompStep {
   User = 'user',
 }
 
-export const compile = (node: Node, scope: Scope = {}, includes: Includes = {}, step: CompStep = CompStep.User) => {
-  const externalScopeKeys = Object.keys(scope)
+export class Sym {
+  constructor(
+    public type: Type,
+    public id: string,
+    public scope: Scope,
+    public token: Token = scope.context.module.root.lexer!.unknown.as(id),
+  ) { }
 
-  // implementations need to provide global scope: `global_mem_ptr: Type.i32`
-  const global: Context = { scope, offsets: {}, elements: {}, params: [] }
-  const funcs: Module['funcs'] = {}
-  const bodies: Map<Func, Node> = new Map()
-
-  // create types
-  const { typeOf, typeAs, cast, castAll, hi, max, top, infer } = Typed()
-
-  // included ambient functions (declared elsewhere or from a previous step)
-  for (const [name, func] of Object.entries(includes)) {
-    if (!('context' in func)) {
-      funcs[name] = {
-        id: name as Token,
-        get params() {
-          return this.context.params
-        },
-        result: func.result,
-        context: {
-          params: func.params.map((x: string, i) => ({
-            id: i.toString(),
-            type: x,
-            default: typeAs(x as Type, [x + '.const', '0']),
-          })) as Arg[],
-          scope: {},
-          offsets: {},
-          elements: {},
-        },
-        body: [],
-      }
-    } else {
-      funcs[name] = func
-    }
+  get $id() {
+    return `$${this.id}`
   }
 
-  /** todo is a "not implemented" marker for ops */
-  const todo = null
-
-  /** zeroifies inf and nan */
-  const denan = (body: SExpr | Node) =>
-    typeOf(body) !== Type.f32
-      ? body
-      : ['call', '$denan', body]
-
-  /** constructs a binary op of least type `type` */
-  const bin = (type: Type, op: string): Op => (lhs, rhs) => top(max(type, hi(lhs, rhs)), [op, lhs, rhs])
-
-  /** constructs a binary op of exact type `type` */
-  const typebin = (type: Type, op: string): Op => (lhs, rhs) => top(type, [op, lhs, rhs])
-
-  /** constructs an equality op */
-  const eq = (op: string): Op =>
-    (lhs, rhs) => {
-      const type = max(Type.i32, hi(lhs, rhs))
-      if (type === Type.f32) return typeAs(Type.bool, top(Type.f32, [op, lhs, rhs]))
-      return typeAs(Type.bool, top(Type.i32, [op + '_s', lhs, rhs]))
-    }
-
-  /** returns a scoped op (`local.xxx` or `global.xxx`) */
-  const scoped = (scope: Scope, op: string) => (scope === global.scope ? 'global' : 'local') + '.' + op
-
-  /** looks up symbol `sym` in context and returns `scope` */
-  const lookup = (local: Context, sym: Token): Scope =>
-    sym in local.scope ? local.scope : sym in global.scope ? global.scope : local.scope
-
-  /** returns number of elements for buffer symbol `sym` */
-  const get_elements = (
-    local: Context,
-    sym: Token,
-  ): Token => (sym in local.elements ? local.elements[sym] : global.elements[sym])
-
-  /** assigns `value` to variable `sym` in context `local` i.e: x=y */
-  const assign_single = (local: Context, sym: Token, value: SExpr) => {
-    const scope = lookup(local, sym)
-    // if symbol is not found in scope, we create it (lazy variable declaration)
-    const type = sym in scope ? scope[sym] : (scope[sym] = typeOf(value))
-    return typeAs(type, [scoped(scope, 'set'), '$' + sym, denan(cast(type, value))])
+  export_id() {
+    return ['export', `"${this.id}"`]
   }
 
-  /** returns buffer position for `offset` for buffer `id` in `scope` */
-  const buffer_pos = (local: Context, scope: Scope, sym: Token, offset?: SExpr) => {
-    // get needle
-    const needle = typeAs(Type.i32, [scoped(scope, 'get'), '$' + sym + '_needle'])
-    // buffer_ptr + ((((offset+needle)*elements) << 2) %% buffer_length)
-    // dprint-ignore
-    return top(Type.i32, ['add',
-      typeAs(Type.i32, [scoped(scope, 'get'), '$' + sym]),
-      typeAs(Type.f32, ['call', '$modwrap', ...castAll(Type.f32,
-        typeAs(Type.i32, ['i32.shl',
-          ['i32.mul',
-            offset ? top(Type.i32, ['add', offset, needle]) : needle,
-            ['i32.const', get_elements(local, sym)],
-          ],
-          ['i32.const', '2']
-        ]),
-        typeAs(Type.i32, [scoped(scope, 'get'), '$' + sym + '_length']))
-      ]),
+  export_mut(value: string | number): SExpr {
+    const t = Typed.max(Type.i32, this.type)
+    const s = ['global', this.$id, this.export_id(), ['mut', t], [
+      `${t}.const`,
+      `${value}`,
+    ]]
+    return s
+  }
+
+  declare_mut(value: string | number): SExpr {
+    const t = Typed.max(Type.i32, this.type)
+    return ['global', this.$id, ['mut', t], [`${t}.const`, `${value}`]]
+  }
+
+  get = () => {
+    const { typeAs, scoped } = this.scope.context.module
+    return typeAs(this.type, [scoped(this.scope, 'get'), this.$id])
+  }
+
+  set = (value: SExpr) => {
+    const { typeAs, scoped, cast, denan } = this.scope.context.module
+    return typeAs(Type.none, [
+      scoped(this.scope, 'set'),
+      this.$id,
+      cast(this.type, denan(value)),
     ])
   }
 
-  /** defines a function */
-  const funcDef = (context: Context, id: Token, params: Node[], body: Node) => {
-    map(params, context, OpParams)
-    const func = (funcs[id] = {
-      id,
-      get params() {
-        return this.context.params
-      },
-      get result() {
-        return typeOf(this.body)
-      },
-      context,
-      // body: typeAs(typeOf(body.at(-1)), body),
-    })
-    bodies.set(func, body)
+  tee = (value: SExpr) => {
+    const { typeAs, scoped, cast, denan } = this.scope.context.module
+
+    if (this.scope === this.scope.context.module.global.scope) {
+      return typeAs(this.type, [this.set(value), this.get()])
+    } else {
+      return typeAs(this.type, [
+        scoped(this.scope, 'tee'),
+        this.$id,
+        cast(this.type, denan(value)),
+      ])
+    }
+  }
+}
+
+export class Scope {
+  symbols: Map<string, Sym> = new Map()
+
+  constructor(public context: Context) { }
+
+  add(type: Type, id: Token | string) {
+    if (this.symbols.has('' + id)) {
+      // we don't create a new symbol object but
+      // we update the type because it is coming late
+      // so it is updated.
+      const sym = this.symbols.get('' + id)!
+      sym.type = type
+      return sym
+    }
+
+    const sym = new Sym(
+      type,
+      '' + id,
+      this,
+      (id as any) instanceof Token
+        ? id as Token
+        : this.context.module.root.lexer!.unknown.as(id as string)
+    )
+
+    this.symbols.set(sym.id, sym)
+
+    return sym
   }
 
-  /** function call */
-  const funcCall = (sym: Token, args: SExpr[]) => {
-    if (Array.isArray(sym))
-      throw new CompilerError(new CompilerErrorCauses.TypeErrorCause(sym[0], 'invalid function passed to map/reduce'))
+  has(id: Token | string) {
+    return this.symbols.has('' + id)
+  }
 
-    const func = funcs[sym]
-    if (!func) throw new CompilerError(new CompilerErrorCauses.ReferenceErrorCause(sym, 'function not defined'))
-    // console.log('CALLING', sym, 'TYPE', body, type)
+  lookup = (id: Token | string): Scope => {
+    const global_scope = this.context.module.global.scope
+    return this.has(id) ? this : global_scope.has(id) ? global_scope : this
+  }
+
+  ensure_sym = (id: Token | string) => {
+    const { forId } = this.context.module
+    const scope = this.lookup(id)
+
+    if (!(scope.has(id))) {
+      throw new CompilerError(
+        new CompilerErrorCauses.ReferenceErrorCause(
+          forId(id),
+          'Symbol not found in scope'
+        )
+      )
+    }
+
+    const sym = scope.symbols.get('' + id)!
+    return { scope, sym }
+  }
+
+  get(id: Token | string) {
+    const { sym } = this.ensure_sym(id)
+    return sym.get()
+  }
+
+  set(id: Token | string, value: SExpr) {
+    const { typeOf } = this.context.module
+    const scope = this.lookup(id)
+
+    // lazy add symbol
+    if (!scope.has(id)) scope.add(typeOf(value), id)
+
+    const { sym } = this.ensure_sym(id)
+
+    return sym.set(value)
+  }
+
+  tee(id: Token & string, value: SExpr) {
+    const { typeOf } = this.context.module
+    const scope = this.lookup(id)
+
+    // lazy add symbol
+    if (!scope.has(id)) scope.add(typeOf(value), id)
+
+    const { sym } = this.ensure_sym(id)
+
+    return sym.tee(value)
+  }
+}
+
+export class Func {
+  body?: SExpr
+  source?: SExpr
+
+  constructor(public context: Context, public id: Token) { }
+
+  get params() {
+    return this.context.params
+  }
+
+  get result() {
+    const { typeOf } = this.context.module
+    return typeOf(this.body)
+  }
+}
+
+export class Context {
+  params: Arg[] = []
+  scope: Scope = new Scope(this)
+  offsets: Record<string, number> = {}
+  elements: Record<string, Token> = {}
+  refs: string[] = []
+  constructor(public module: Module) { }
+
+  get_elements = (
+    sym: Sym,
+  ) => (sym.id in this.elements
+    ? this.elements[sym.id]
+    : this.module.global.elements[sym.id])
+
+  get_buffer = (id: Token | string) => {
+    // const { scope, sym } = this.scope.ensure_sym(id)
+    const scope = this.scope.lookup(id)
+    const sym = scope.add(Type.i32, id)
+    // console.log(id, scope)
+    const buffer = new Buffer(scope.context, sym)
+    return buffer
+  }
+
+  build = (node: Node, ops: OpTable): SExpr => {
+    if (Array.isArray(node)) {
+      const [sym, ...nodes] = node as [Token & string, Node[]]
+      if (!sym || !nodes.length) return []
+      let op = ops[sym]
+      if (!op)
+        throw new CompilerError(
+          new CompilerErrorCauses.InvalidErrorCause(sym, 'not implemented')
+        )
+      if (Array.isArray(op))
+        op = op.find((x) => x.length === nodes.length || x.length === 0)
+          || op[0]
+      return op.length
+        ? (<Op>op)(...this.map(nodes, ops))
+        : (<() => NodeOp>op)()(this, ops)(...nodes)
+    } else {
+      const op = ops[node.group]
+      if (!op)
+        throw new CompilerError(
+          new CompilerErrorCauses.InvalidErrorCause(node, 'not implemented')
+        )
+      return (<() => CtxOp>op)()(this, ops)(node)
+    }
+  }
+
+  map = (nodes: Node[], ops: OpTable): SExpr[] =>
+    nodes
+      .filter(Boolean)
+      .map((x) => this.build(x, ops))
+      .filter((x) => x.length > 0)
+
+  /** defines a function */
+  funcDef = (id: Token | string, params: Node[], body: Node) => {
+    this.map(params, this.module.OpTables.OpParams)
+    const func = this.module.funcs[`${id}`] = new Func(this, id as Token)
+    this.module.bodies.set(func, body)
+  }
+}
+
+export class Module extends Typed {
+  body: SExpr = []
+  bodies: Map<Func, Node> = new Map()
+  funcs: Record<string, Func> = {}
+
+  exported_id = 0
+  exported: Map<SExpr, number> = new Map()
+  exported_params: Map<Arg, Set<string>> = new Map()
+  exported_params_map: Map<string, SExpr> = new Map()
+
+  init_body?: SExpr
+
+  fill_body: SExpr = []
+
+  constructor(
+    public root: Node,
+    public types = new Map<object | string, Type>(),
+  ) {
+    super(types)
+  }
+
+  get f_type(): Type {
+    return this.typeOf(this.funcs.f?.body)
+  }
+
+  get f_params(): Arg[] {
+    return this.funcs.f?.params ?? []
+  }
+
+  funcCall = (id: Node | Token | string, args: SExpr[]) => {
+    const { exported, exported_params, exported_params_map } = this
+
+    if (Array.isArray(id))
+      throw new CompilerError(
+        new CompilerErrorCauses.TypeErrorCause(
+          id[0] as Token,
+          'invalid function passed to map/reduce'
+        )
+      )
+
+    const sym = id as string
+    const func = this.funcs[sym]
+    if (!func)
+      throw new CompilerError(
+        new CompilerErrorCauses.ReferenceErrorCause(
+          id as Token,
+          'function not defined'
+        )
+      )
+
+    // const origArgs = [...args]
 
     // examine function argument declarations against passed arguments
     func.params.forEach((param, i) => {
-      // console.log(sym, param)
+      if (exported.has(args[i])) {
+        const sexpr = args[i]
+        const export_id = `export/${sym}/${param.id}/${exported.get(args[i])}`
+        args[i] = this.typeAs(param.type, ['global.get', `$${export_id}`])
+
+        let exported_params_args = exported_params.get(param)
+        if (!exported_params_args)
+          exported_params.set(param, exported_params_args = new Set())
+        exported_params_args.add(export_id)
+
+        exported_params_map.set(export_id, sexpr)
+      }
+      // const isRest = origArgs[Math.min(i, origArgs.length - 1)]?.[0] == '...'
+
+      // if (isRest) {
+      //   param.export = true
+      //   // @ts-ignore
+      //   args[i] = void 0
+      // }
+
       let param_default
       if (param.export) {
-        const export_id = '$export/' + sym + '/' + param.id
-        param_default = typeAs(global.scope[export_id], ['global.get', export_id])
+        const export_default_$id = `$export/${sym}/${param.id}`
+        param_default = this.typeAs(param.type, [
+          'global.get',
+          export_default_$id,
+        ])
       } else {
         if (param.default)
           param_default = param.default
         else if (param.range)
           param_default = param.range[0] as SExpr
         else
-          param_default = typeAs(Type.f32, ['f32.const', '0'])
+          param_default = this.typeAs(Type.f32, ['f32.const', '0'])
       }
       // param_default = cast(Type.f32, param_default)
 
@@ -251,16 +504,36 @@ export const compile = (node: Node, scope: Scope = {}, includes: Includes = {}, 
         if (!args[i]) args[i] = param_default
         // has passed argument but cast it to correct type
         // else args[i] = cast(Type.f32, args[i])
-        else args[i] = cast(param.type, args[i])
+        else args[i] = this.cast(param.type, args[i])
       } // function argument declaration has range
       else if (param.range) {
         // missing passed argument becomes the start of range value
         if (!args[i]) args[i] = param_default
         // has passed argument but cast it to correct type
         // else args[i] = cast(Type.f32, args[i])
-        else args[i] = cast(param.type, args[i])
+        else {
+          args[i] = this.cast(param.type, args[i])
+
+          if (param.type === Type.f32) {
+            args[i] = this.typeAs(Type.f32, [
+              'call',
+              '$clamp',
+              args[i],
+              param.range[0],
+              param.range[1],
+            ])
+          } else {
+            args[i] = this.typeAs(Type.i32, [
+              'call',
+              '$clampi',
+              args[i],
+              param.range[0],
+              param.range[1],
+            ])
+          }
+        }
       } // has passed argument but no default, it is cast implicitly to f32
-      else if (args[i]) args[i] = cast(Type.f32, args[i])
+      else if (args[i]) args[i] = this.cast(param.type ?? Type.f32, args[i])
       // did not pass argument and no default, so implicitly push a zero f32 (0.0)
       else args[i] = param_default
       // TODO: call $limit_range(args[i], param.range[0], param.range[1])
@@ -268,654 +541,213 @@ export const compile = (node: Node, scope: Scope = {}, includes: Includes = {}, 
     // truncate number of passed arguments down to the accepted function arguments
     args.length = func.params.length
     // call the function
-    return typeAs(func.result, ['call', '$' + sym, ...args])
+    return this.typeAs(func.result, ['call', '$' + sym, ...args])
   }
 
-  /** primary optable */
-  const Op: OpTable = {
-    ',': todo,
-    ';': (): CtxOp => (local, ops) => (lhs, rhs) => map([...flatten(';', lhs), rhs], local, ops),
-    '..': (lhs, rhs) => [lhs, rhs],
+  /** returns a scoped op (`local.xxx` or `global.xxx`) */
+  scoped = (scope: Scope, op: string) =>
+    `${(scope === this.global.scope ? 'global' : 'local')}.${op}`
 
-    // x:y | x:y,z : buffer declare allocate
-    ':': (): CtxOp =>
-      (local, ops) =>
-        (lhs, rhs) => {
-          const sym = lhs
-          if (sym[0] !== '#') {
-            throw new CompilerError(
-              new CompilerErrorCauses.SyntaxErrorCause(lhs, 'buffer variables must begin with a hash(`#`) symbol')
-            )
-          }
+  /** zeroifies inf and nan */
+  denan = (body: SExpr) =>
+    this.typeOf(body) !== Type.f32
+      ? body
+      : this.typeAs(Type.f32, ['call', '$denan', body])
 
-          // get size,elements (elements default to 1)
-          const [size_raw, elements] = flatten(',', rhs) as [Node, Token]
-
-          // size can be an expression
-          const size = cast(Type.i32, build(size_raw, local, ops))
-
-          // elements are a constant so we store them as compiler meta, elements default to 1
-          local.elements[sym] = elements || ((rhs as Token).as('1', 'num') as Token)
-
-          // buffer info
-          // offset 0: needle i32
-          // offset 4: ...contents...
-          const { scope } = local
-          scope[sym] = Type.i32 // pointer
-          scope[sym + '_size'] = Type.i32 // size in indexes
-          scope[sym + '_length'] = Type.i32 // length in bytes (size * elements)
-          scope[sym + '_needle'] = Type.i32 // needle index
-
-          // dprint-ignore
-          return [
-        // store the global memory pointer for the buffer
-        [scoped(scope, 'set'), '$' + sym, ['global.get', '$global_mem_ptr']],
-        // store the buffer size in indexes
-        [scoped(scope, 'set'), '$' + sym + '_size', size],
-        // store the buffer length (size * elements) << 2 === size * elements * 4 (f32 is 4 bytes per element)
-        [scoped(scope, 'set'), '$' + sym + '_length',
-          ['i32.shl',
-            ['i32.mul', [
-              scoped(scope, 'get'), '$' + sym + '_size'],
-              ['i32.const', local.elements[sym]]
-            ],
-            ['i32.const', '2']
-          ]
-        ],
-        // read needle from memory and store in local
-        [scoped(scope, 'set'), '$' + sym + '_needle', ['i32.load', [scoped(local.scope, 'get'), '$' + sym]]],
-        // advance the global memory pointer using the buffer length
-        ['global.set', '$global_mem_ptr',
-          ['i32.add',
-            ['global.get', '$global_mem_ptr'],
-            ['i32.add',
-              ['i32.const', '4'], // +1 i32 element for the needle
-              [scoped(scope, 'get'), '$' + sym + '_length'],
-            ]
-          ]
-        ],
-      ]
-        },
-
-    // x::y map/reduce buffer `x` with map function `y`, reduces by summing
-    '::': (): CtxOp =>
-      local =>
-        (lhs, rhs) => {
-          const sym = lhs
-          if (sym[0] !== '#') {
-            throw new CompilerError(
-              new CompilerErrorCauses.SyntaxErrorCause(
-                lhs,
-                'map/reduce `::` operator\'s left hand side must be a buffer variable'
-              )
-            )
-          }
-
-          const buffer_scope = lookup(local, sym)
-          if (!(sym in buffer_scope))
-            throw new CompilerError(new CompilerErrorCauses.ReferenceErrorCause(sym, 'symbol not defined'))
-
-          const elements = get_elements(local, sym)
-
-          local.scope['temp_index'] = Type.i32
-          local.scope['temp_sum'] = Type.f32
-          local.scope['temp_buffer_pos'] = Type.i32
-          local.scope['temp_buffer_one_index_length'] = Type.i32
-
-          // dprint-ignore
-          return typeAs(Type.f32, [
-            [scoped(local.scope, 'set'), '$temp_index', ['i32.const', '0']],
-            [scoped(local.scope, 'set'), '$temp_sum', ['f32.const', '0']],
-            [scoped(local.scope, 'set'), '$temp_buffer_pos', [scoped(buffer_scope, 'get'), '$' + sym]],
-            [scoped(local.scope, 'set'), '$temp_buffer_one_index_length',
-              ['i32.shl',
-                ['i32.const', elements],
-                ['i32.const', '2']
-              ]
-            ],
-            ['loop $loop',
-              [scoped(local.scope, 'set'), '$temp_sum',
-                ['f32.add',
-                  [scoped(local.scope, 'get'), '$temp_sum'],
-                  funcCall(rhs as Token, Array.from({ length: +elements }).map((_, i) =>
-                    typeAs(Type.f32, [`f32.load offset=${(i+1) * 4}`,
-                      [scoped(local.scope, 'get'), '$temp_buffer_pos'],
-                    ])
-                  )),
-                ]
-              ],
-              [scoped(local.scope, 'set'), '$temp_buffer_pos',
-                ['i32.add',
-                  [scoped(local.scope, 'get'), '$temp_buffer_pos'],
-                  [scoped(local.scope, 'get'), '$temp_buffer_one_index_length'],
-                ]
-              ],
-              // i++
-              [scoped(local.scope, 'set'), '$temp_index',
-                ['i32.add', [scoped(local.scope, 'get'), '$temp_index'], ['i32.const', '1']]],
-              // if (i !== buffer_size) continue $loop
-              ['br_if $loop',
-                ['i32.ne',
-                  [scoped(local.scope, 'get'), '$temp_index'],
-                  [scoped(buffer_scope, 'get'), '$' + sym + '_size']
-                ]
-              ],
-            ],
-            [scoped(local.scope, 'get'), '$temp_sum']
-          ])
-        },
-
-    '=': (): CtxOp =>
-      (local, ops) =>
-        (lhs, rhs) => {
-          if (Array.isArray(lhs)) {
-            // f()=x : function declaration
-            if (lhs[0] == '@') {
-              const [id, params] = [lhs[1], flatten(',', lhs[2]).filter(Boolean)] as [Token, Node[]]
-              // const scope = Object.fromEntries(
-              //   params.map(x => {
-              //     if (Array.isArray(x)) x = x.flat(Infinity).find(x => x.group === 'ids')
-              //     return [x, Type.f32]
-              //   })
-              // )
-              const context: Context = { scope: {}, offsets: {}, elements: {}, params: [] }
-              funcDef(context, id, params, rhs)
-              return []
-            } // {x,y}=(z,w) : store operation
-            else if (lhs[0] == '{') {
-              const vars = flatten(',', lhs[1]) as Token[]
-              const vals = map(flatten(',', rhs), local, ops)
-              return vars.map((sym, i) => [
-                `f32.store offset=${local.offsets[sym]}`,
-                ['local.get', '$local_mem_ptr'],
-                cast(Type.f32, vals[i]),
-              ])
-            } // (x,y)=(z,w) : multivalue assignment
-            else if (lhs[0] == ',') {
-              const vars = flatten(',', lhs) as Token[]
-
-              // if function call or buffer read
-              if (rhs[0] == '@') {
-                const sym = rhs[1] as Token
-
-                // (x,y)=#(z) : buffer read at offset `z` and expand/destructure tuple values to variables `x,y`
-                if (sym[0] == '#') {
-                  const scope = lookup(local, sym)
-                  if (!(sym in scope))
-                    throw new CompilerError(new CompilerErrorCauses.ReferenceErrorCause(sym, 'symbol not defined'))
-
-                  const elements = get_elements(local, sym)
-                  if (vars.length > +elements) {
-                    throw new CompilerError(
-                      new CompilerErrorCauses.TypeErrorCause(
-                        vars.at(-1)!,
-                        `number of variables(\`${vars.length}\`) are greater than the number of elements(\`${elements}\`)`
-                      )
-                    )
-                  }
-
-                  const offset = build(rhs[2] as Token, local, ops)
-
-                  scope['temp_buffer_pos'] = Type.i32
-
-                  return [
-                    // write buffer position at offset in temporary variable
-                    [scoped(scope, 'set'), '$temp_buffer_pos', buffer_pos(local, scope, sym, offset)],
-                    // assign buffer elements in variables (i+1 because 1 byte for needle)
-                    ...vars.map((sym, i) =>
-                      assign_single(
-                        local,
-                        sym,
-                        typeAs(Type.f32, [`f32.load offset=${(i + 1) * 4}`, [scoped(scope, 'get'), '$temp_buffer_pos']])
-                      )
-                    ),
-                  ]
-                } // (a,b)=f() : TODO: function call multi-value return assignment
-                else {
-                  throw new CompilerError(new CompilerErrorCauses.InvalidErrorCause(sym, 'not implemented'))
-                }
-              } // else try regular var=value assignment
-              else {
-                const vals_raw = flatten(',', rhs)
-                if (vars.length != vals_raw.length) {
-                  throw new CompilerError(
-                    new CompilerErrorCauses.TypeErrorCause(
-                      rhs[0] as Token,
-                      `number of values(\`${vals_raw.length}\`) do not match number of variables(\`${vars.length}\`)`
-                    )
-                  )
-                }
-                const vals = map(vals_raw, local, ops)
-                return vars.map((sym, i) => assign_single(local, sym, vals[i]))
-              }
-            } // invalid
-            else {
-              throw new CompilerError(
-                new CompilerErrorCauses.SyntaxErrorCause(lhs[0], 'invalid assignment')
-              )
-            }
-          } else {
-            // #x=y | #x=(y,z): buffer write and advance needle
-            if (lhs[0] === '#') {
-              const sym = lhs
-              const scope = lookup(local, sym)
-              if (!(sym in scope))
-                throw new CompilerError(new CompilerErrorCauses.ReferenceErrorCause(sym, 'symbol not defined'))
-
-              const elements = get_elements(local, sym)
-              const rhs_raw = flatten(',', rhs)
-              if (+elements != rhs_raw.length) {
-                throw new CompilerError(
-                  new CompilerErrorCauses.TypeErrorCause(
-                    lhs,
-                    `number of values(\`${rhs_raw.length}\`) do not match number of elements(\`${elements}\`)`
-                  )
-                )
-              }
-
-              // map build values
-              const vals = map(rhs_raw, local, ops)
-
-              // get needle position
-              const needle = typeAs(Type.i32, [scoped(scope, 'get'), '$' + sym + '_needle'])
-
-              // holds the calculated buffer position at needle
-              scope['temp_buffer_pos'] = Type.i32
-
-              // dprint-ignore
-              return [
-                // write buffer position in temporary variable
-                [scoped(scope, 'set'), '$temp_buffer_pos', buffer_pos(local, scope, sym)],
-                // write vals at current needle position (offset i+1 because of needle 1 byte)
-                ...vals.map((val, i) => [
-                  `f32.store offset=${(i+1) * 4}`,
-                  [scoped(scope, 'get'), '$temp_buffer_pos'],
-                  denan(cast(Type.f32, val))
-                ]),
-                // advance needle
-                [scoped(scope, 'set'), '$' + sym + '_needle', ['i32.add', ['i32.const', '1'], needle]],
-                // write needle
-                ['i32.store', [scoped(scope, 'get'), '$' + sym], needle],
-              ]
-            } // x=y : variable assignment
-            else {
-              const sym = lhs
-              const value = build(rhs, local, ops)
-              return assign_single(local, sym, value)
-            }
-          }
-        },
-
-    // // x?y:z : ternary conditional
-    // '?': (cond, then_body, else_body) => {
-    //   const type = hi(then_body, else_body)
-    //   return typeAs(type, [
-    //     'if',
-    //     ['result', max(Type.i32, type)],
-    //     cast(Type.bool, cond),
-    //     ['then', cast(type, then_body)],
-    //     ['else', cast(type, else_body)],
-    //   ])
-    // },
-    // x?=y:z : ternary conditional using select
-    // TODO: testing to see if select works for everything
-    '?': (cond, then_body, else_body) => {
-      const type = hi(then_body, else_body)
-      // dprint-ignore
-      return typeAs(type, [
-        'select',
-        cast(type, then_body),
-        cast(type, else_body),
-        cond,
-      ])
-    },
-
-    // logical Or
-    '||': (): NodeOp =>
-      (local, ops) =>
-        (...nodes) => {
-          const [lhs, rhs] = map(nodes, local, ops)
-          const type = hi(lhs, rhs)
-          const temp = '__lhs__' + type
-          const zero = top(type, ['const', '0'])
-          if (!(temp in local.scope)) local.scope[temp] = type
-          return typeAs(type, [
-            'if',
-            ['result', max(Type.i32, type)],
-            top(type, ['ne', zero, ['local.tee', temp, cast(type, lhs)]]),
-            ['then', ['local.get', temp]],
-            ['else', cast(type, rhs)],
-          ])
-        },
-
-    // logical And
-    // commented out because it's implemented as an AST rewrite
-    // in parser as a ternary: lhs!=0?rhs:0, also it was wrong.
-    // '&&': (lhs, rhs) => {
-    //   const type = hi(lhs, rhs)
-    //   const zero = top(type, ['const', '0'])
-    //   return typeAs(type, [
-    //     'if',
-    //     ['result', max(Type.i32, type)],
-    //     top(type, ['ne', zero, cast(type, lhs)]),
-    //     ['then', cast(type, rhs)],
-    //     ['else', zero],
-    //   ])
-    // },
-
-    // x|y : bitwise OR
-    '|': typebin(Type.i32, 'or'),
-
-    // x^y : bitwise XOR
-    '^': typebin(Type.i32, 'xor'),
-
-    '**': (lhs, rhs) => typeAs(Type.f32, ['call', '$pow', ...castAll(Type.f32, lhs, rhs)]),
-
-    // x&y : bitwise AND
-    '&': typebin(Type.i32, 'and'),
-
-    '==': (lhs, rhs) => typeAs(Type.bool, bin(Type.i32, 'eq')(lhs, rhs)),
-    '!=': (lhs, rhs) => typeAs(Type.bool, bin(Type.i32, 'ne')(lhs, rhs)),
-
-    '<': eq('lt'),
-    '>': eq('gt'),
-    '<=': eq('le'),
-    '>=': eq('ge'),
-
-    // x>>y : bitwise shift right
-    '>>': typebin(Type.i32, 'shr_s'),
-    // x<<y : bitwise shift left
-    '<<': typebin(Type.i32, 'shl'),
-
-    '+': [
-      // x+y : arithmetic add
-      bin(Type.i32, 'add'),
-      // +x  : cast to number
-      x => cast(max(Type.i32, typeOf(x)), x),
-    ],
-    '-': [
-      // x-y : arithmetic subtract
-      bin(Type.i32, 'sub'),
-      // -x  : arithmetic negate
-      x => bin(Type.i32, 'mul')(top(max(Type.i32, typeOf(x)), ['const', '-1']), x),
-    ],
-
-    // x*y : arithmetic multiply
-    '*': bin(Type.i32, 'mul'),
-    // x/y : arithmetic divide
-    //  note: division casts to float, this way it doesn't trap and
-    //    also makes more sense: 1/2==0.5
-    '/': bin(Type.f32, 'div'),
-    // x%y : modulo/remainder
-    '%': (lhs, rhs) => {
-      const type = hi(lhs, rhs)
-      if (type === Type.f32) return typeAs(Type.f32, ['call', '$mod', ...castAll(Type.f32, lhs, rhs)])
-      if (type === Type.bool) return top(Type.i32, ['rem_s', lhs, rhs])
-      return top(Type.i32, ['rem_u', lhs, rhs])
-    },
-    // x%%y : modulo wrap (wraps negative numbers around)
-    '%%': (lhs, rhs) => typeAs(Type.f32, ['call', '$modwrap', ...castAll(Type.f32, lhs, rhs)]),
-    // !x : logical Not
-    '!': x => top(Type.bool, ['eqz', x]),
-    // ~x : bitwise NOT
-    '~': x => top(Type.i32, ['not', x]),
-    // // #x : buffer read position x
-    // '#': (): CtxOp => (local, ops) => rhs => {
-    //   const x = build(rhs, local, ops)
-    //   return typeAs(Type.f32, ['f32.load', buffer_pos(x)])
-    // },
-
-    // {x,y,z} : load operations
-    '{': (): CtxOp =>
-      local =>
-        rhs => {
-          local.scope['local_mem_ptr'] = Type.i32
-          const vars = (<Token[]> flatten(',', rhs)).map((sym: Token, i) => {
-            const offset = i * 4
-            const op = typeAs(Type.f32, [`f32.load offset=${offset}`, ['local.get', '$local_mem_ptr']])
-            local.scope[sym] = typeOf(op)
-            local.offsets[sym] = offset
-            return typeAs(Type.f32, ['local.set', '$' + sym, op])
-          })
-          // dprint-ignore
-          return [
-        // store the global memory pointer for our context for later writes
-        ['local.set', '$local_mem_ptr', ['global.get', '$global_mem_ptr']],
-        ...vars,
-        // update the global memory pointer
-        ['global.set', '$global_mem_ptr', ['i32.add', ['i32.const', '' + vars.length * 4],
-        ['global.get', '$global_mem_ptr']]]
-      ]
-        },
-    '[': todo,
-    '(': todo,
-    '@': (): CtxOp =>
-      (local, ops) =>
-        (sym, rhs) => {
-          // #b(x) : buffer read `b` at offset `x`
-          if (sym[0] === '#') {
-            const scope = lookup(local, sym)
-            if (!(sym in scope))
-              throw new CompilerError(new CompilerErrorCauses.ReferenceErrorCause(sym, 'symbol not defined'))
-            const offset = build(rhs, local, ops)
-            return typeAs(Type.f32, ['f32.load offset=4', buffer_pos(local, scope, sym, offset)])
-          } // f() : function call
-          else {
-            // evaluate argument expressions
-            const args = map(flatten(',', rhs), local, ops)
-            return funcCall(sym, args)
-          }
-        },
-    '.': todo,
-
-    num: (): CtxOp => () => lit => top(infer(lit), ['const', lit]),
-
-    ids: (): CtxOp =>
-      local =>
-        sym => {
-          const scope = lookup(local, sym) // sym in local.scope ? local.scope : sym in global.scope ? global.scope : local.scope
-          if (!(sym in scope))
-            throw new CompilerError(new CompilerErrorCauses.ReferenceErrorCause(sym, 'symbol not defined'))
-          const type = scope[sym]
-          return typeAs(type, [scoped(scope, 'get'), '$' + sym])
-        },
+  /** infers the type of a token literal string: bool for 0 or 1, i32 for integers and f32 for floats */
+  infer = (x: Token & string): Type => {
+    if ('01'.includes(x)) return Type.bool
+    else if (x.endsWith('f')) return Type.f32
+    else if (!x.includes('.')) return Type.i32
+    else if (x.includes('.')) return Type.f32
+    else
+      throw new CompilerError(
+        new CompilerErrorCauses.TypeErrorCause(
+          this.forId(x),
+          'cannot infer type for'
+        )
+      )
   }
 
-  /** arguments optable */
-  const OpParams: OpTable = {
-    ...Op,
-    '.': (): CtxOp =>
-      (local, ops) =>
-        id => {
-          if (Array.isArray(id)) id = build(id, local, ops)[0] as Token
-          const param = mush(local.params, { id, export: true }) as Arg
-          if (!param.type)
-            local.scope[id] = param.type = Type.f32
-          return [id]
-        },
-    '=': (): CtxOp =>
-      (local, ops) =>
-        (id, value) => {
-          // if it's not an atom then it has ranges
-          if (Array.isArray(id)) id = build(id, local, ops)[0] as Token
-
-          const defaultValue = build(value, local, Op)
-          const param = mush(local.params, { id, default: defaultValue }) as Arg
-
-          const type = hi(param.default!, ...(param.range ?? []))
-
-          param.default = cast(type, param.default!)
-
-          local.scope[id] = param.type = type
-
-          if (param.range) {
-            param.range[0] = cast(type, param.range[0] as SExpr)
-            param.range[1] = cast(type, param.range[1] as SExpr)
-          }
-
-          return [id]
-        },
-    '[': (): CtxOp =>
-      local =>
-        (id, rhs) => {
-          if (rhs == null) {
-            throw new CompilerError(
-              new CompilerErrorCauses.InvalidErrorCause(id, 'Invalid parameter range for')
-            )
-          }
-
-          const range = build(rhs, local, Op) as [SExpr, SExpr]
-          if (!Array.isArray(range[0]) || !Array.isArray(range[1])) {
-            throw new CompilerError(
-              new CompilerErrorCauses.InvalidErrorCause(id, 'Invalid parameter range for')
-            )
-          }
-
-          const param = mush(local.params, { id, range }) as Arg
-          const type = hi(param.default!, ...range)
-
-          if (param.default) param.default = cast(type, param.default)
-
-          local.scope[id] = param.type = type
-
-          range[0] = cast(type, range[0])
-          range[1] = cast(type, range[1])
-
-          return [id]
-        },
-    ids: (): CtxOp =>
-      local =>
-        id => {
-          const type = Type.f32
-          mush(local.params, { id, type })
-          local.scope[id] = type
-          return [id]
-        },
+  forId = (id: Token | string) => {
+    return (id as any) instanceof Token
+      ? id as Token
+      : this.root.lexer!.unknown.as('' + id)
   }
 
-  /** builds a `node` under context `ctx` and optable `ops` */
-  const build = (node: Node, ctx: Context, ops: OpTable): SExpr => {
-    if (Array.isArray(node)) {
-      const [sym, ...nodes] = node as [Token, Node[]]
-      if (!sym || !nodes.length) return []
-      let op = ops[sym]
-      if (!op) throw new CompilerError(new CompilerErrorCauses.InvalidErrorCause(sym, 'not implemented'))
-      if (Array.isArray(op)) op = op.find(x => x.length === nodes.length) || op[0]
-      return op.length ? (<Op> op)(...map(nodes, ctx, ops)) : (<() => NodeOp> op)()(ctx, ops)(...nodes)
+  global: Context = new Context(this)
+  ops = Ops(this)
+  OpTables = opTables(this)
+
+  valueOf() {
+    return this.body
+  }
+}
+
+export const compile = (
+  root: Node,
+  scope_record: Record<string, Type> = {},
+  includes: Includes = {},
+  init_body: Module['init_body'] = [],
+  fill_body: Module['fill_body'] = [],
+  types: TypesMap = new Map(),
+  step: CompStep = CompStep.User,
+) => {
+  // implementations need to provide global scopeRecord: `global_mem_ptr: Type.i32`
+
+  const externalScopeKeys = Object.keys(scope_record)
+  const unknown = root.lexer!.unknown
+
+  const mod = new Module(root, types)
+  mod.fill_body = [...fill_body]
+
+  const { global, funcs, bodies, typeOf, typeAs, max, top } = mod
+
+  for (const [id, type] of Object.entries(scope_record)) {
+    global.scope.add(type, id)
+  }
+
+  // included ambient functions (declared elsewhere or from a previous step)
+  for (const [name, func] of Object.entries(includes)) {
+    if (!('context' in func)) {
+      const context = new Context(mod)
+
+      context.params = func.params.map((x: string, i) =>
+        Object.assign(
+          new Arg(unknown.as(`${i}`) as Token & string, x as Type),
+          {
+            default: top(x as Type, ['const', '0']),
+          }
+        )
+      )
+
+      const f = funcs[name] = new Func(context, unknown.as(name))
+      f.body = typeAs(func.result, [])
     } else {
-      const op = ops[node.group]
-      if (!op) throw new CompilerError(new CompilerErrorCauses.InvalidErrorCause(node, 'not implemented'))
-      return (<() => CtxOp> op)()(ctx, ops)(node)
+      funcs[name] = func
+      // func.body = typeAs(func.result, func.body!)
+      // console.log('yes', name, func.result, typeOf(func.body))
     }
   }
-
-  /** builds an array of `nodes` under context `ctx` and optable `ops` */
-  const map = (nodes: Node[], ctx: Context, ops: OpTable): SExpr[] =>
-    nodes
-      .filter(Boolean)
-      .map(x => build(x, ctx, ops))
-      .filter(x => x.length > 0)
 
   // ==================================================================================
   // init
 
   if (step === CompStep.Lib)
-    funcDef(global, '__drop__' as Token, [], node)
+    global.funcDef('__drop__', [], root)
   else {
-    // create begin function
-    funcDef(global, '__begin__' as Token, [], node)
-    // create start function
-    funcDef({ scope: {}, offsets: {}, elements: {}, params: [] }, '__start__' as Token, [], [])
-    // funcDef({ scope, offsets: {}, elements: {}, params: [] }, '__start__' as Token, [], node)
+    global.funcDef('__begin__', [], root)
+    global.funcDef('__start__', [], [])
+    global.funcDef('update_exports', [], [])
   }
 
   // compile function bodies
   for (const [func, body] of bodies) {
-    const b = map(flatten(';', body), func.context, Op)
-    // console.log(func.id, b.at(-1), typeOf(b.at(-1)))
-    // func.body = typeAs(Type.f32, b) // TODO: defer type evaluation for fn calls
+    const b = func.context.map(flatten(';', body), mod.OpTables.Op)
     func.body = typeAs(typeOf(b.at(-1)), b)
   }
 
-  // create module
-  const mod: Module = {
-    body: step === CompStep.Lib ? [] : ([['start', '$__start__']] as SExpr),
-    funcs,
-    typeOf,
-    valueOf() {
-      return this.body
-    },
+  mod.body = []
+  // mod.body = step === CompStep.Lib ? [] : ([['start', '$__start__']] as SExpr)
+
+  if (step === CompStep.User) {
+    funcs.__start__.body!.push(
+      ...(init_body || []),
+      ...mod.fill_body
+    )
+    // console.log(funcs.__start__.body)
+    // console.log(S(funcs.__start__.body))
+    // funcs.__start__.body!.push([
+    //   'global.set',
+    //   '$start_ptr',
+    //   ['global.get', '$global_mem_ptr'],
+    // ])
+  } else {
+    mod.init_body = funcs.__drop__.body
+    delete funcs.__drop__
   }
 
-  if (step === CompStep.User)
-    funcs.__start__.body!.push(['call', '$__begin__'])
-  else
-    delete funcs.__drop__
-
   // create globals
-  for (const [id, type] of Object.entries(global.scope)) {
+  for (const [id, sym] of global.scope.symbols) {
     if (externalScopeKeys.includes(id)) continue
 
-    const t = max(Type.i32, type)
-    mod.body.push(['global', '$' + id, ['mut', t], [t + '.const', '0']])
+    // const t = max(Type.i32, sym.type)
+    // if (sym.id.includes('export/')) mod.body.push(sym.export_mut(0))
+    if (sym.id.includes('temp')) mod.body.push(sym.declare_mut(0))
+    else mod.body.push(sym.export_mut(0))
   }
 
   // create exported params as globals
   for (const [id, func] of Object.entries(funcs)) {
-    if (id in includes) continue
+    // if (id in includes) continue
 
     func.params
-      .filter(param => param.export)
-      .forEach(param => {
-        const export_id = 'export/' + id + '/' + param.id
-        const type = (global.scope[export_id] = func.context.scope[param.id])
-        const t = max(Type.i32, type)
+      .filter((param) => param.export || mod.exported_params.has(param))
+      .forEach((param) => {
+        const { sym } = func.context.scope.ensure_sym(param.id)
 
-        // put the default value in global scope
-        mod.body.push(['global', '$' + export_id, ['export', `"${export_id}"`], ['mut', t], [t + '.const', '0']])
+        // let export_default: Sym
+
+        const export_id = `export/${id}/${param.id}`
+
+        const t = max(Type.i32, sym.type)
+
+        const export_min = global.scope.add(sym.type, `${export_id}/min`)
+        const export_max = global.scope.add(sym.type, `${export_id}/max`)
+
+        if (param.range) {
+          funcs.update_exports.body!.push(export_min.set(param.range[0] as SExpr))
+          funcs.update_exports.body!.push(export_max.set(param.range[1] as SExpr))
+        }
 
         if (param.range || !param.default) {
           // put the ranges in globals so they can be read from the client after they've evaluated
-          mod.body.push(['global', '$' + export_id + '/min', ['export', `"${export_id}/min"`], ['mut', t], [
-            t + '.const',
-            '0',
-          ]])
-          mod.body.push(['global', '$' + export_id + '/max', ['export', `"${export_id}/max"`], ['mut', t], [
-            t + '.const',
-            '1',
-          ]])
-          global.scope[export_id + '/min'] = type
-          global.scope[export_id + '/max'] = type
+          mod.body.push(export_min.export_mut(0))
+          mod.body.push(export_max.export_mut(1))
+        }
+
+        const init_default = (export_id: string, value?: SExpr) => {
+          const export_default = global.scope.add(sym.type, export_id)
+
+          mod.body.push(export_default.export_mut(0)) // ['global', export_default.$id, ['export', `"${export_id}"`], ['mut', t], [t + '.const', '0']])
+
+          if (value) {
+            param.originalDefault = value
+            funcs.update_exports.body!.push(export_default.set(value))
+          } else {
+            // dprint-ignore
+            funcs.update_exports.body!.push(export_default.set(
+              top(t, ['add',
+                export_min.get(),
+                [t + '.div' + (t === 'i32' ? '_s' : ''),
+                [t + '.sub',
+                export_max.get(),
+                export_min.get(),
+                ],
+                [t + '.const', '2']
+                ]
+              ])
+            ))
+          }
+
+          return export_default
+        }
+
+        // put the default value in global scope
+        if (param.export) {
+          param.default = init_default(export_id, param.default).get()
+        }
+
+        const exported_params_args = mod.exported_params.get(param)
+        if (exported_params_args) {
+          for (const id of exported_params_args) {
+            // console.log('found', id)
+            init_default(id, mod.exported_params_map.get(id))
+          }
         }
 
         // change the default value to use the global one, but keep reference to previous value
         // for later use. TODO: find cleaner way to pass exported params
-
-        if (param.range) {
-          funcs.__start__.body!.push(['global.set', '$' + export_id + '/min', param.range[0]])
-          funcs.__start__.body!.push(['global.set', '$' + export_id + '/max', param.range[1]])
-        }
-
-        if (param.default) {
-          param.originalDefault = param.default
-          funcs.__start__.body!.push(['global.set', '$' + export_id, param.default])
-        } else {
-          // dprint-ignore
-          funcs.__start__.body!.push(['global.set', '$' + export_id,
-            [t + '.add',
-              ['global.get', '$' + export_id + '/min'],
-              [t + '.div' + (t === 'i32' ? '_u' : ''), // TODO: _u or _s ??
-                [t + '.sub',
-                  ['global.get', '$' + export_id + '/max'],
-                  ['global.get', '$' + export_id + '/min']
-                ],
-                [t + '.const', '2']
-              ]
-            ]
-          ])
-        }
-
-        param.default = typeAs(t, ['global.get', '$' + export_id])
       })
   }
 
@@ -927,22 +759,41 @@ export const compile = (node: Node, scope: Scope = {}, includes: Includes = {}, 
       'func',
       '$' + id,
       ['export', `"${id}"`],
-      ...func.params.map(param => ['param', '$' + param.id, max(Type.i32, func.context.scope[param.id])]),
-      ...(func.body!.length && !['__start__', '__begin__'].includes(id)
-        ? [['result', max(Type.i32, func.result)]]
+      ...func.params.map(
+        (
+          param,
+        ) => [
+            'param',
+            '$' + param.id,
+            max(Type.i32, func.context.scope.ensure_sym(param.id).sym.type),
+          ]
+      ),
+      ...(func.body!.length && !['update_exports', '__start__', '__begin__'].includes(id)
+        ? [
+          func.result === Type.multi
+            ? [
+              'result',
+              ...(func.body!.at(-1)! as any).map((x: any) =>
+                max(Type.i32, typeOf(x))
+              ),
+            ]
+            : ['result', max(Type.i32, func.result)],
+        ]
         : []),
-      ...(!['__start__', '__begin__'].includes(id)
-        ? Object.entries(func.context.scope)
-          .filter(([x]) => !func.params.find(param => param.id == x))
-          .map(([x, type]) => ['local', '$' + x, max(Type.i32, type)])
+      ...(!['update_exports', '__start__', '__begin__'].includes(id)
+        ? [...func.context.scope.symbols]
+          .filter(([x]) => !func.params.find((param) => param.id == x))
+          .map(([x, sym]) => ['local', '$' + x, max(Type.i32, sym.type)])
         : []),
       // TODO: how to determine if start needs to drop? below was: [...func.body!, 'drop']
-      ...(['__start__', '__begin__'].includes(id) ? (func.body!.length ? [...func.body!] : []) : func.body!),
+      ...(['update_exports', '__start__', '__begin__'].includes(id)
+        ? (func.body!.length ? [...func.body!] : [])
+        : func.body!),
     ]
 
-    // console.log(func.source, typeOf(func.body))
     mod.body.push(func.source)
   }
 
+  // console.log(S(mod.body))
   return mod
 }

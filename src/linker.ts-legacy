@@ -1,9 +1,10 @@
 import { cheapRandomId } from 'everyday-utils'
 import rfdc from 'rfdc'
 import * as wat from 'wat-compiler'
-import { compile, CompStep, Includes, Module, Scope, Type } from './compiler'
+import { compile, CompStep, Includes, Module, Type } from './compiler'
 import { parse } from './parser'
 import { S, SExpr } from './sexpr'
+import { TypesMap } from './typed'
 
 const copy = rfdc({ proto: true, circles: false })
 
@@ -12,6 +13,8 @@ const copy = rfdc({ proto: true, circles: false })
 export interface LinkerConfig {
   memory: WebAssembly.MemoryDescriptor
   metrics: boolean | number
+  memPadding: number
+  samplePointers?: number[][]
 }
 
 export class Linker {
@@ -21,7 +24,14 @@ export class Linker {
   config: LinkerConfig
   module?: Module
   sexpr: (linker: Linker) => SExpr = () => []
-  lib?: { context: wat.Context; scope: Scope; includes: Includes }
+  lib?: {
+    context: wat.Context
+    scope: Record<string, Type>
+    includes: Includes
+    init_body: SExpr
+    fill_body: SExpr
+    types: TypesMap
+  }
   mono: Record<string, string> = {}
 
   // wasm
@@ -39,10 +49,9 @@ export class Linker {
 
     //!? `[${this.id}] binary size: %d bytes`, this.binary.length
 
-    this.instance = (await WebAssembly.instantiate(this.binary!, { env: { memory: this.memory } })).instance
-
-    // const wasmModule = new WebAssembly.Module(this.binary!)
-    // this.instance = new WebAssembly.Instance(wasmModule, { env: { memory: this.memory } })
+    this.instance = (await WebAssembly.instantiate(this.binary!, {
+      env: { memory: this.memory },
+    })).instance
 
     //!timeEnd `[${this.id}] make`
     return
@@ -56,19 +65,46 @@ export class Linker {
 
     //!time `[${this.id}] parse`
     const ast = parse(src)
+    if (!ast) {
+      throw new Error('No ast produced.')
+    }
+    if (!ast.lexer) {
+      throw new Error('No lexer')
+    }
     //!timeEnd `[${this.id}] parse`
 
+    // for (const func in lib.includes) {
+    //   for (const p of ((lib.includes[func] as any)?.context?.params ?? [])) {
+    //     if (p.originalDefault) p.default = p.originalDefault
+    //     delete p.export
+    //   }
+    // }
     //!time `[${this.id}] compile`
-    this.module = compile(ast, copy(lib.scope), lib.includes, CompStep.User)
+    this.module = compile(
+      ast,
+      copy(lib.scope),
+      lib.includes,
+      [...lib.init_body],
+      [...lib.fill_body],
+      new Map(lib.types),
+      CompStep.User
+    )
     //!timeEnd `[${this.id}] compile`
-
+    // console.log(S(this.module.body))
     //!time `[${this.id}] binary`
     const sexpr = ['module', ...this.sexpr(this), ...this.module.body]
 
     // debugger
     // console.log(S(sexpr))
 
-    this.binary = wat.default(S(sexpr), this.config as wat.Options, copy(lib.context))
+    // console.log(lib.context.module.funcs)
+    // console.log(lib.context.module.datas)
+    this.binary = wat.default(
+      S(sexpr),
+      this.config as wat.Options,
+      copy(lib.context)
+    )
+    // console.log(this.binary.slice(120, 150))
     //!timeEnd `[${this.id}] binary`
 
     //!timeEnd `[${this.id}] link`
@@ -81,19 +117,35 @@ export class Linker {
     const includes: Includes = {}
 
     const source = Object.values(lib)
-      .map(x => (typeof x === 'function' ? x(this.config) : x))
+      .map((x) => (typeof x === 'function' ? x(this.config) : x))
       .join('\n')
 
-    const context = wat.compile(wat.parse(wat.tokenize('(module ' + source + ')')))
-
+    // console.log(source)
+    const context = wat.compile(
+      wat.parse(wat.tokenize('(module ' + source + ')'))
+    )
     for (const code of context.module.codes) {
       const [params, result] = context.module.types[code.type_idx].split(',')
-      includes[code.name] = { params: params.split(' '), result: result.split(' ')[0] }
+      // console.log(code.name, params, result)
+      // if (code.name === 'env.seed') continue
+      includes[code.name] = {
+        params: params.split(' '),
+        result: result.split(' ')[0],
+      }
     }
 
-    const scope = Object.fromEntries(context.global.globals.map(x => [x.name, x.type as Type]))
+    const scope = Object.fromEntries(
+      context.global.globals.map((x) => [x.name, x.type as Type])
+    )
 
-    this.lib = { context, scope, includes }
+    this.lib = {
+      context,
+      scope,
+      includes,
+      init_body: [],
+      fill_body: [],
+      types: new Map(),
+    }
 
     //!timeEnd `[${this.id}] lib`
     return
@@ -110,19 +162,36 @@ export class Linker {
     const lib = this.lib!
 
     //!time `[${this.id}] lib mono parse`
-    const ast = parse([...Object.values(this.mono)].join(';').replace(/;{1,}/g, ';'))
+    const ast = parse(
+      [...Object.values(this.mono)].join(';').replace(/;{1,}/g, ';')
+    )
     //!timeEnd `[${this.id}] lib mono parse`
 
     //!time `[${this.id}] lib mono compile`
-    const module = compile(ast, lib.scope, lib.includes, CompStep.Lib)
+    const mod = compile(
+      ast,
+      lib.scope,
+      lib.includes,
+      [],
+      [],
+      lib.types,
+      CompStep.Lib
+    )
+    // console.log(S(mod.body))
+
     lib.includes = Object.assign(
       lib.includes,
-      Object.fromEntries(Object.entries(module.funcs).filter(([name]) => !(name in lib.includes)))
+      Object.fromEntries(
+        Object.entries(mod.funcs).filter(([name]) => !(name in lib.includes))
+      )
     )
+    lib.init_body = mod.init_body!
+    lib.fill_body = mod.fill_body
+
     //!timeEnd `[${this.id}] lib mono compile`
 
     //!time `[${this.id}] lib mono binary`
-    const sexpr = ['module', ...module.body]
+    const sexpr = ['module', ...mod.body]
     wat.default(S(sexpr), this.config as wat.Options, lib.context)
     //!timeEnd `[${this.id}] lib mono binary`
 

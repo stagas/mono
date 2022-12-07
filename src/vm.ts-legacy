@@ -1,0 +1,453 @@
+import { Token } from 'lexer-next'
+import { Arg } from './compiler'
+import { Module, Struct } from './compiler'
+import * as libmath from './lib/math'
+import libmono from './lib/mono'
+import * as libvm from './lib/vm'
+import * as libwat from './lib/wat'
+import { Linker } from './linker'
+import { Type } from './typed'
+
+export interface VMConfig {
+  channels: number
+  blockSize: number
+  sampleRate: number
+  sampleCount: number
+  sampleChannels: number
+  sampleSeconds: number
+  samplePointers: number[][]
+}
+
+const defaultConfig: VMConfig = {
+  /** Number of initial channels (default: `1`) */
+  channels: 1,
+  /** Block size in number of elements (default: `128`) */
+  blockSize: 128,
+  /** Sample rate */
+  sampleRate: 44100,
+  /** Number of sample buffers. */
+  sampleCount: 6,
+  /** Sample channels (mono=1 stereo=2). */
+  sampleChannels: 2,
+  /** Sample duration. */
+  sampleSeconds: 4,
+  /** Sample pointers. */
+  samplePointers: [],
+}
+
+const parseArg =
+  /(?<arg>'?\s*(?<id>[a-zA-Z_$][a-zA-Z0-9_$]*)(?<range>\[[^\]]*?\])?(=.*?(?<default>[^\s,)]+)?)?).*?(,|\)\s*=)/s
+
+export class MonoParam {
+  id!: Token
+  sourceIndex!: number
+  source!: {
+    arg: string
+    id: string
+    range: string
+    default: string
+  }
+  name!: string
+  minValue!: number
+  maxValue!: number
+  defaultValue!: number
+  normalValue!: number
+  scaleValue!: number
+
+  constructor(data: Partial<MonoParam>) {
+    Object.assign(this, data)
+    this.scaleValue = this.maxValue - this.minValue
+    this.normalValue = this.normalize(this.defaultValue)
+  }
+
+  normalize(value: number) {
+    return (value - this.minValue) / this.scaleValue
+  }
+
+  scale(normal: number) {
+    return normal * this.scaleValue + this.minValue
+  }
+}
+
+const KB = 1024
+const MB = 1024 * KB
+
+// NOTE: these need to reflect the values in lib/vm.ts
+const PAGE_BYTES = 64 * KB
+export const MEM_PADDING = 1 * PAGE_BYTES
+const MB_PER_CHANNEL = 5
+export const CHANNEL_BYTES = MB * MB_PER_CHANNEL
+const MAX_CHANNELS = 6
+
+export class VM {
+  isReady = false
+  skipMono = false
+
+  code = ''
+
+  config: VMConfig
+
+  linker: Linker
+  module?: Module
+  instance?: WebAssembly.Instance
+
+  floats!: Float32Array
+  inputs!: Float32Array[]
+  outputs!: Float32Array[]
+  samples!: (Float32Array & { structData: Int32Array })[][]
+
+  initial = true
+
+  constructor(config: Partial<VMConfig> = {}) {
+    this.config = { ...defaultConfig, ...config }
+
+    this.linker = new Linker({
+      memory: {
+        initial: Math.ceil(
+          (MEM_PADDING
+            + this.sampleBufferSizes.bytes
+            + CHANNEL_BYTES
+            + this.config.channels * CHANNEL_BYTES) / PAGE_BYTES
+        ),
+        maximum: Math.ceil(
+          (MEM_PADDING
+            + this.sampleBufferSizes.bytes
+            + CHANNEL_BYTES
+            + MAX_CHANNELS * CHANNEL_BYTES) / PAGE_BYTES
+        ),
+      },
+      memPadding: (MEM_PADDING + this.sampleBufferSizes.bytes),
+      metrics: false,
+    })
+
+    this.makeSampleBuffers()
+    this.makeFloats()
+    this.linkLib()
+  }
+
+  get sampleBufferSizes() {
+    const channel = this.config.sampleRate * this.config.sampleSeconds
+      + Object.keys(Struct.Buffer).length - 1
+    const one = channel * this.config.sampleChannels
+    const bytes = one * this.config.sampleCount * Float32Array.BYTES_PER_ELEMENT
+    const pages = bytes / PAGE_BYTES
+    return { one, channel, bytes, pages }
+  }
+
+  makeFloats() {
+    const { channels, blockSize } = this.config
+
+    this.floats = new Float32Array(this.linker.memory.buffer)
+    this.inputs = Array.from({ length: channels })
+    this.outputs = Array.from({ length: channels })
+
+    const startPos = MEM_PADDING + this.sampleBufferSizes.bytes + CHANNEL_BYTES
+    for (let i = 0; i < channels; i++) {
+      const pos = startPos + i * CHANNEL_BYTES
+      this.inputs[i] = new Float32Array(
+        this.linker.memory.buffer,
+        pos,
+        blockSize
+      )
+      this.outputs[i] = new Float32Array(
+        this.linker.memory.buffer,
+        pos + blockSize * Float32Array.BYTES_PER_ELEMENT,
+        blockSize
+      )
+    }
+  }
+
+  makeSampleBuffers() {
+    const { sampleCount, sampleChannels } = this.config
+
+    const sizes = this.sampleBufferSizes
+    this.floats = new Float32Array(this.linker.memory.buffer)
+    this.samples = Array.from(
+      { length: sampleCount },
+      () => Array.from({ length: sampleChannels })
+    )
+
+    // start where the input/output channels end
+    const startPos = MEM_PADDING //channels * (CHANNEL_BYTES + MEM_PADDING)
+    const pointers = [] as number[][]
+
+    for (let i = 0; i < sampleCount; i++) {
+      this.samples[i] = []
+      const samplePointers = [] as number[]
+      pointers.push(samplePointers)
+      for (let c = 0; c < sampleChannels; c++) {
+        const pos = startPos + (
+          (i * sizes.one + c * sizes.channel)
+          * Float32Array.BYTES_PER_ELEMENT
+        )
+        samplePointers.push(pos)
+        this.samples[i][c] = Object.assign(
+          new Float32Array(
+            this.linker.memory.buffer,
+            pos + 5 * Int32Array.BYTES_PER_ELEMENT,
+            sizes.channel - 5
+          ),
+          {
+            structData: new Int32Array(
+              this.linker.memory.buffer,
+              pos,
+              5
+            ),
+          }
+        )
+      }
+    }
+
+    this.config.samplePointers = pointers
+  }
+
+  linkLib() {
+    this.linker.config.samplePointers = this.config.samplePointers
+    this.linker.linkLib({ env: libvm.env, ...libwat, ...libmath })
+
+    if (!this.skipMono) this.linker.linkMono(libmono)
+
+    this.linker.linkSExpr(() => [
+      libvm.fill({
+        type: this.f_type,
+        params: this.f_params,
+        blockSize: this.config.blockSize,
+        channelBytes: CHANNEL_BYTES,
+        memPadding: MEM_PADDING + this.sampleBufferSizes.bytes + CHANNEL_BYTES,
+      }),
+    ])
+  }
+
+  get exports() {
+    return this.instance?.exports as {
+      [k: string]: ((...args: number[]) => number) | WebAssembly.Global | any
+    } & libvm.VM
+  }
+
+  get funcs() {
+    return this.linker.module!.funcs
+  }
+
+  dirtyParams = true
+  #params?: MonoParam[]
+
+  get params(): MonoParam[] {
+    if (this.dirtyParams) {
+      this.#params = this.fetchParams()
+      this.dirtyParams = false
+    }
+    return this.#params!
+  }
+
+  fetchParams() {
+    if (!this.module || !this.instance) return []
+
+    const { exported_params, exported_params_map } = this.module
+
+    // @ts-ignore
+    // this.instance.exports.__start__()
+    return Object.values(this.module.funcs ?? {})
+      .map((
+        f,
+      ) => [f.id, f.params.filter((p) => p.export || exported_params.has(p))])
+      .filter((x) => x[1].length)
+      .map(
+        ([id, params]: any) =>
+          params.map((p: Arg) => {
+            const export_id_min = p.id.as(`export/${id}/${p.id}/min`) as
+              & Token
+              & string
+            const export_id_max = p.id.as(`export/${id}/${p.id}/max`) as
+              & Token
+              & string
+
+            const minValue =
+              (this.instance!.exports[export_id_min] as any)?.value ?? 0
+            const maxValue =
+              (this.instance!.exports[export_id_max] as any)?.value ?? 1
+
+            const exported: MonoParam[] = []
+
+            if (p.export) {
+              const export_id = p.id.as(`export/${id}/${p.id}`) as
+                & Token
+                & string
+              const defaultValue =
+                (this.instance!.exports[export_id] as any)?.value
+                  ?? (maxValue - minValue) * 0.5 + minValue
+
+              // let code = ''
+              // let sourceIndex = -1
+              // let source = { arg: '', id: '', range: '', default: '' }
+              // if (!(`${id}` in (this.linker?.lib?.includes ?? {}))) {
+              // find the index of the dot `.` that made the param export by moving
+              // backwards from the id index that we have access to here
+              const code = p.id.source.input
+              const sourceIndex = code.lastIndexOf('\'', export_id.source.index)
+              const source = code.slice(sourceIndex).match(parseArg)!
+                .groups as MonoParam['source']
+              // }
+              exported.push(
+                new MonoParam({
+                  id: export_id,
+                  sourceIndex,
+                  source,
+                  name: export_id.toString(),
+                  minValue,
+                  maxValue,
+                  defaultValue,
+                })
+              )
+            }
+
+            const exported_params_args = exported_params.get(p)
+            if (exported_params_args) {
+              for (const id of exported_params_args) {
+                const defaultValue = (this.instance!.exports[id] as any)?.value
+                  ?? (maxValue - minValue) * 0.5 + minValue
+
+                // console.log('got default value?', defaultValue, id, this.instance!.exports)
+                // @ts-ignore
+                const token = exported_params_map.get(id)[1] as Token
+                // console.log('TOKEN IS', token)
+                const sourceIndex = token.index
+                exported.push(
+                  new MonoParam({
+                    id: p.id.as(id),
+                    sourceIndex,
+                    source: {
+                      arg: token.source.input.slice(
+                        sourceIndex,
+                        sourceIndex + token.length
+                      ),
+                    } as any,
+                    name: id,
+                    minValue,
+                    maxValue,
+                    defaultValue,
+                  })
+                )
+              }
+            }
+
+            return exported
+          })
+        // argToMonoParam({ ...p, default: p.originalDefault, id: p.id.as('export/' + id + '/' + p.id) as Token })
+        // )
+      )
+      .flat(Infinity)
+  }
+
+  get f_type(): Type {
+    return this.linker.module!.typeOf(this.funcs.f?.body)
+  }
+
+  get f_params(): Arg[] {
+    return this.funcs.f?.params ?? [] // .map(argToMonoParam)
+  }
+
+  setNumberOfChannels(numberOfChannels: number) {
+    const diff = numberOfChannels - this.config.channels
+    if (diff > 0) {
+      console.log(
+        'memory grow by',
+        diff,
+        'channels. was:',
+        this.config.channels,
+        'now:',
+        numberOfChannels
+      )
+      this.linker.memory.grow(Math.ceil((diff * CHANNEL_BYTES) / PAGE_BYTES))
+      this.config.channels = numberOfChannels
+      this.makeSampleBuffers()
+      this.makeFloats()
+    }
+    for (let i = 0; i < this.config.channels; i++) {
+      this.inputs[i].fill(0)
+    }
+  }
+
+  setSampleBuffer(index: number, buffer: Float32Array[]) {
+    const sample = this.samples[index]
+    for (let c = 0; c < sample.length; c++) {
+      const channel = buffer[Math.min(c, buffer.length - 1)]
+      const len = Math.min(sample[c].length, channel.length)
+
+      sample[c].structData.set([
+        0,
+        0,
+        len,
+        len - 1,
+        len * Float32Array.BYTES_PER_ELEMENT,
+      ])
+
+      sample[c].set(channel.subarray(0, len))
+
+      if (channel.length < sample[c].length) {
+        sample[c].fill(0, channel.length)
+      }
+    }
+  }
+
+  export_entries: any[] = []
+
+  async setCode(code: string) {
+    this.linker.link(code)
+    await this.linker.make()
+
+    // update code only after linker has been successful
+    this.code = code
+
+    // we copy these because they are instantiated at two async steps
+    // before the linker is ready, and "module" and "instance" can diverge
+    // if we were to access them directly from the linker, leading to errors
+    // const export_entries = []
+    // if (!this.initial) {
+    //   // ;(this.instance as any).exports.fill(0, 0, 0, 0)
+    //   for (
+    //     const [key, global] of Object.entries((this.instance as any).exports)
+    //   ) {
+    //     if (global instanceof WebAssembly.Global) {
+    //       export_entries.push([key, global.value])
+    //     }
+    //   }
+    //   // console.log(export_entries)
+
+    //   // const global_mem_ptr = (this.instance as any).exports.global_mem_ptr.value
+    //   // new Uint8Array(this.linker.memory.buffer, 0, global_mem_ptr).fill(0)
+    // }
+
+    this.module = this.linker.module
+    this.instance = this.linker.instance // TODO: this shouldn't be needed
+    if (this.initial) {
+      ;(this.instance as any).exports.__start__() // ;(this.instance as any).exports.__begin__()
+      ;(this.instance as any).exports.fill(0, 0, 0, 0)
+      this.export_entries = []
+      for (
+        const [key, global] of Object.entries((this.instance as any).exports)
+      ) {
+        if (global instanceof WebAssembly.Global) {
+          this.export_entries.push([key, global.value])
+        }
+      } // console.log(export_entries)
+
+      // const global_mem_ptr = (this.instance as any).exports.global_mem_ptr.value
+      // new Uint8Array(this.linker.memory.buffer, 0, global_mem_ptr).fill(0)
+
+      // ;(this.instance as any).exports.__begin__()
+    } else {
+      for (const [key, value] of this.export_entries) {
+        try {
+          ;(this.instance as any).exports[key].value = value
+        } catch {}
+      }
+      // ;(this.instance as any).exports.__begin__()
+      // ;(this.instance as any).exports.__begin__()
+    }
+
+    this.initial = false
+    this.dirtyParams = true
+    this.isReady = true
+    // this.config.metrics && console.log('mono: ready')
+  }
+}

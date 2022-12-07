@@ -1,3 +1,4 @@
+// @env browser
 import { parse } from '../src/parser'
 
 describe('parse', () => {
@@ -112,8 +113,16 @@ describe('parse', () => {
       expect('' + parse('#1:4,2;foo')).toEqual('(; (: #1 (, 4 2)) foo)')
     })
 
+    it('array', () => {
+      expect('' + parse('#:[1,2,3]')).toEqual('(: # ([ (, (, 1 2) 3)))')
+    })
+
     it('map/reduce', () => {
-      expect('' + parse('#1::foo')).toEqual('(:: #1 foo)')
+      expect('' + parse('#1::foo:sum')).toEqual('(:: #1 foo sum)')
+    })
+
+    it('map/reduce identity', () => {
+      expect('' + parse('#1:::sum')).toEqual('(:: #1 () sum)')
     })
 
     it('read', () => {
@@ -226,6 +235,12 @@ describe('parse', () => {
       expect('' + parse('1;;')).toEqual('1')
       expect('' + parse('1;;;')).toEqual('1')
       expect('' + parse('1; ; ;')).toEqual('1')
+    })
+  })
+
+  describe('keywords', () => {
+    it('while', () => {
+      expect('' + parse('while x<y i++')).toEqual('(while (< x y) (= i (+ i 1)))')
     })
   })
 })

@@ -1,8 +1,10 @@
-export interface SExpr extends Array<string | SExpr> {
-  [n: number]: string | SExpr
+import { Token } from 'tinypratt'
+
+export interface SExpr extends Array<string | (string & Token) | SExpr> {
+  [n: number]: string | (string & Token) | SExpr
 }
 
-export const S = (p: string | SExpr, x = 0): string => {
+export const S = (p: string | (string & Token) | SExpr, x = 0): string => {
   return Array.isArray(p)
     ? p.length
       ? Array.isArray(p[0])
@@ -17,7 +19,7 @@ export const S = (p: string | SExpr, x = 0): string => {
     : p
 }
 
-export const S0 = (p: string | SExpr): string => {
+export const S0 = (p: string | (string & Token) | SExpr): string => {
   return Array.isArray(p)
     ? p.length
       ? Array.isArray(p[0])

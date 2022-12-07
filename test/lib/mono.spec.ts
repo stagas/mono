@@ -1,3 +1,4 @@
+// @env browser
 import { VM } from '../../src/vm'
 
 const b = async (s: string) => {
@@ -11,7 +12,7 @@ let floats: Float32Array
 
 describe('mono', () => {
   it('lp', async () => {
-    ;(await b('f(x)=lp(sin(t*x*pi2), 333.0, 2.5)')).fill(0, 5, 666)
+    ;(await b('f(x)=lp(sin(t*x*pi2), 333.0, 2.5)')).fill(0, 0, 5, 666)
 
     expect([...floats]).toMatchSnapshot()
 

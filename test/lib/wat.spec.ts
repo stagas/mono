@@ -1,3 +1,4 @@
+// @env browser
 import { VM } from '../../src/vm'
 
 const b = async (s: string) => {

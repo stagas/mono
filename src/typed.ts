@@ -1,5 +1,4 @@
-import { CompilerError, CompilerErrorCauses } from './compiler'
-import { Token } from './parser'
+import { Node } from './parser'
 import { SExpr } from './sexpr'
 
 export enum Type {
@@ -7,6 +6,8 @@ export enum Type {
   bool = 'bool',
   i32 = 'i32',
   f32 = 'f32',
+  multi = 'multi',
+  none = 'none',
 }
 
 const I32Suffixed = `
@@ -17,65 +18,80 @@ const I32Suffixed = `
   convert_i32 convert_i64
 `.split(/\s+/)
 
-export const Types: Type[] = [Type.any, Type.bool, Type.i32, Type.f32]
+export const Types: Type[] = [Type.any, Type.bool, Type.i32, Type.f32, Type.none]
 
 export const W = (x: Type) => Types.indexOf(x)
 
-/** returns at least the precision of the given type among the given types */
-export const max = (type: Type, ...types: Type[]): Type => {
-  return Types[Math.max(Types.indexOf(type), ...types.map(x => Types.indexOf(x)))]
+export const OpTypeCast: Record<Type, Partial<Record<Type, string>>> = {
+  [Type.any]: {},
+  [Type.multi]: {},
+  [Type.f32]: {
+    [Type.i32]: 'f32.convert_i32_s',
+    [Type.bool]: 'f32.convert_i32_u',
+  },
+  [Type.i32]: {
+    [Type.f32]: 'i32.trunc_f32_s',
+  },
+  [Type.bool]: {
+    [Type.f32]: 'i32.trunc_f32_u',
+  },
+  [Type.none]: {
+    [Type.bool]: 'i32.const 0',
+    [Type.i32]: 'i32.const 0',
+    [Type.f32]: 'f32.const 0',
+  },
 }
 
-export const Typed = () => {
-  const types = new Map<object | string, Type>()
+export type TypesMap = Map<object | string, Type>
 
-  const OpTypeCast: Record<Type, Partial<Record<Type, string>>> = {
-    [Type.any]: {},
-    [Type.f32]: {
-      [Type.i32]: 'f32.convert_i32_s',
-      [Type.bool]: 'f32.convert_i32_u',
-    },
-    [Type.i32]: {
-      [Type.f32]: 'i32.trunc_f32_s',
-    },
-    [Type.bool]: {
-      [Type.f32]: 'i32.trunc_f32_u',
-    },
+export class Typed {
+  static Type = Type
+  static Types = Types
+  static OpTypeCast = OpTypeCast
+  static W = W
+
+  static max = (type: Type, ...types: Type[]): Type => {
+    return Types[Math.max(W(type), ...types.map(W))]
   }
 
+  W = Typed.W
+  max = Typed.max
+
+  constructor(public types: TypesMap = new Map()) {}
+
   /** looks up and returns the type of `x`, if found, otherwise returns type `any` */
-  const typeOf = (x: undefined | string | SExpr): Type => ((x && types.get(x)) ?? Type.any) as Type
+  typeOf = (x: undefined | string | Node | SExpr): Type => ((x && this.types.get(x)) ?? Type.any) as Type
 
   /** marks sexpr `x` to be of type `type` */
-  const typeAs = (type: Type, x: SExpr) => {
+  typeAs = (type: Type, x: SExpr) => {
     if (typeof x === 'string') return x // TODO: why are tokens infected with typeAs? only SExpressions should
-    types.set(x, type)
+    this.types.set(x, type)
     return x
   }
 
   /** creates a cast operation if the given value `x` doesn't satisfy `type` */
-  const cast = (targetType: Type, x: SExpr) => {
-    const sourceType = typeOf(x)
+  cast = (targetType: Type, x: SExpr) => {
+    const sourceType = this.typeOf(x)
     if (sourceType != targetType) {
-      const castOp = OpTypeCast[targetType][sourceType]
-      if (!castOp) return typeAs(targetType, x) // noop cast, but change the type for x
-      return typeAs(targetType, [castOp, x])
+      const castOp = OpTypeCast[targetType]?.[sourceType]
+      if (!castOp) return this.typeAs(targetType, x) // noop cast, but change the type for x
+      return this.typeAs(targetType, [castOp, x])
     } else {
-      return typeAs(targetType, x) // x is any or unknown, so set the type for x
+      return this.typeAs(targetType, x) // x is any or unknown, so set the type for x
     }
   }
 
   /** casts all `values` to be of type `type` */
-  const castAll = (type: Type, ...values: SExpr): SExpr => values.map(x => cast(type, x as SExpr))
+  castAll = (type: Type, ...values: SExpr): SExpr => values.map((x) => this.cast(type, x as SExpr))
 
   /** returns the highest precision type of the given values */
-  const hi = (...values: SExpr): Type => {
-    const weights = values.filter(Boolean).map(x => W(typeOf(x)))
+  hi = (...values: SExpr): Type => {
+    const weights = values.filter(Boolean).map((x) => W(this.typeOf(x)))
     return Types[Math.max(...weights)]
   }
 
   /** types an operation with the correct prefix (f32 or i32) and type casts the values to satisfy the op */
-  const top = (type: Type, ops: SExpr): SExpr => {
+  top = (type: Type, ops: SExpr): SExpr => {
     const prefix = type == Type.f32 ? 'f32' : 'i32'
     const [op, ...values] = ops
 
@@ -84,16 +100,6 @@ export const Typed = () => {
     let suffix = ''
     if (type === 'i32' && I32Suffixed.includes('' + op)) suffix = '_s'
 
-    return typeAs(type, [prefix + '.' + op + suffix, ...castAll(type, ...values)])
+    return this.typeAs(type, [`${prefix}.${op}${suffix}`, ...this.castAll(type, ...values)])
   }
-
-  /** infers the type of a token literal string: bool for 0 or 1, i32 for integers and f32 for floats */
-  const infer = (x: Token): Type => {
-    if (x == '0' || x == '1') return Type.bool
-    else if (!x.includes('.')) return Type.i32
-    else if (x.includes('.')) return Type.f32
-    else throw new CompilerError(new CompilerErrorCauses.TypeErrorCause(x, 'cannot infer type for'))
-  }
-
-  return { typeOf, typeAs, cast, castAll, hi, max, top, infer }
 }

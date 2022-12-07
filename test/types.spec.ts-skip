@@ -1,3 +1,4 @@
+// @env browser
 import { S } from '../src/sexpr'
 import { Type } from '../src/typed'
 import { VM } from '../src/vm'

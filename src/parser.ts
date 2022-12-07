@@ -1,13 +1,17 @@
-import { createParser, joinRegExp, Node, Token } from 'tinypratt'
+import { createParser, joinRegExp, Node, Token, TokenJson } from 'tinypratt'
 import { flatten, unflatten } from './util'
 
-export type { Node, Token }
+export type { Node }
+
+export { Token }
+export type { TokenJson }
 
 export const parse = (input: string) => Parse(input.replace(/[;\s]*$/g, '')) // [input].join(';').replace(/;{1,}/g, ';'))
 
 export const Parse = createParser(
   joinRegExp(
     [
+      /(?<kwd>while|drop|\.\.\.)/,
       /(?<ids>[#a-zA-Z_$][a-zA-Z0-9_$]*)/,
       // TODO: support .5 .3 ...
       // TODO: support 1k(1000) 2k 1K(1024) ...
@@ -15,7 +19,7 @@ export const Parse = createParser(
       // TODO: support 1b(beat) 1m(measure)
       /(?<num>inf|nan|\.\.|\d*\.?\d*e[+-]?\d+|(\d*\.((e[+-]?)?[\d]+)*\d+|\.\d+|\d+)(ms|[skKBbf])?)/,
       /(?<nul>\s+|\\\*[^]*?\*\\|\\.*)/,
-      /(?<ops>\*\*|%%|::|\?=|\+\+|--|\+=|-=|\*=|\/=|%=|<<=|>>=|&=|\^=|\|=|&&|!&|\|\||!=|==|>=|<=|>>|<<|\.\.|[[\](){}\\"'`,\-~+*/%=<>?!:;.|&^@]{1})/,
+      /(?<ops>\*\*|%%|:=|::|\?=|\+\+|--|\+=|-=|\*=|\/=|%=|<<=|>>=|&=|\^=|\|=|&&|!&|\|\||!=|==|>=|<=|>>>|>>|<<|\.\.|[[\](){}\\"'`,\-~+*/%=<>?!:;.|&^@]{1})/,
       /(?<err>.)/,
     ],
     'g'
@@ -29,25 +33,31 @@ export const Parse = createParser(
           x = x[1]
           const lhs = flatten(',', x as Node[])
           const rhs = expr(r)
-          const res = lhs.map(x => [t.as('='), [t.as('{'), x], [t.as(op), x, rhs]])
+          const res = lhs.map((
+            x,
+          ) => [t.as('='), [t.as('{'), x], [t.as(op), x, rhs]])
           return unflatten(t.as(';') as Token, res as Node[])
         } else {
           const lhs = flatten(',', x as Node[])
           const rhs = expr(r)
-          const res = lhs.map(x => [t.as('='), x, [t.as(op), x, rhs]])
+          const res = lhs.map((x) => [t.as('='), x, [t.as(op), x, rhs]])
           return unflatten(t.as(';') as Token, res as Node[])
         }
       }
 
     const parseNumber = (t: Token) => {
       const isFloat = t.includes('.') || t.at(-1) == 'f'
-      let parsed = parseFloat(t).toString()
+      let parsed = parseFloat(`${t}`).toString()
       if (isFloat && !parsed.includes('.')) parsed += '.0'
       const number = t.as(parsed)
       const lastTwo = t.slice(-2)
       const lastOne = t.at(-1)
       if (lastTwo === 'ms')
-        return [t.as('*', 'ops'), [t.as('*', 'ops'), number, t.as('sr', 'ids')], t.as('0.001')]
+        return [
+          t.as('*', 'ops'),
+          [t.as('*', 'ops'), number, t.as('sr', 'ids')],
+          t.as('0.001'),
+        ]
       else if (lastOne === 's')
         return [t.as('*', 'ops'), number, t.as('sr', 'ids')]
       else if (lastOne === 'k')
@@ -57,15 +67,30 @@ export const Parse = createParser(
       else if (lastOne === 'b')
         return [t.as('*', 'ops'), number, t.as('br', 'ids')]
       else if (lastOne === 'B')
-        return [t.as('*', 'ops'), [t.as('*', 'ops'), number, t.as('br', 'ids')], t.as('mr', 'ids')]
+        return [
+          t.as('*', 'ops'),
+          [t.as('*', 'ops'), number, t.as('br', 'ids')],
+          t.as('mr', 'ids'),
+        ]
       return number
     }
+
+    const ternary = (sym: string, min_bp: number) =>
+      until(sym, min_bp, (t, L, M, r) => [t, L, M, expr(r)])
 
     return {
       ops: [[], never],
       eof: [[], never],
       ids: [[], pass],
-      num: [[], { nud: t => parseNumber(t), led: (t, _, x) => [x, parseNumber(t)] }],
+      kwd: [[], pass],
+      num: [[], {
+        nud: (t) => parseNumber(t),
+        led: (t, _, x) => [x, parseNumber(t)],
+      }],
+
+      drop: [[], pass],
+
+      while: [[], { nud: (t) => [t, expr(0), expr(0)] }],
 
       ';': [[1, 1], { led: bin, nud: (_, __, x: any) => expr(x) }],
 
@@ -74,6 +99,7 @@ export const Parse = createParser(
 
       ':': [[3, 1], { led: bin }],
       '=': [[3, 3], { led: bin }],
+      ':=': [[3, 3], { led: bin }],
       '+=': [[3, 2], { led: varbin('+') }],
       '-=': [[3, 2], { led: varbin('-') }],
       '*=': [[3, 2], { led: varbin('*') }],
@@ -85,12 +111,23 @@ export const Parse = createParser(
       '^=': [[3, 2], { led: varbin('^') }],
       '|=': [[3, 2], { led: varbin('|') }],
 
-      '?': [[4, 2], { led: until(':', 3, (t, L, M, r) => [t, L, M, expr(r)]) }],
+      '?': [[4, 2], { led: ternary(':', 3) }],
       // '?=': [[4, 2], { led: until(':', 3, (t, L, M, r) => [t, L, M, expr(r)]) }],
 
       '||': [[5, 4], { led: bin }],
 
-      '&&': [[6, 5], { led: (t, r, x) => [t.as('?'), [t.as('!='), t.as('0', 'num'), x], expr(r), t.as('0', 'num')] }],
+      '&&': [[6, 5], {
+        led: (
+          t,
+          r,
+          x,
+        ) => [
+            t.as('?'),
+            [t.as('!='), t.as('0', 'num'), x],
+            expr(r),
+            t.as('0', 'num'),
+          ],
+      }],
 
       '|': [[7, 6], { led: bin }],
 
@@ -107,12 +144,13 @@ export const Parse = createParser(
       '>=': [[11, 10], { led: bin }],
 
       '>>': [[12, 11], { led: bin }],
+      '>>>': [[12, 11], { led: bin }],
       '<<': [[12, 11], { led: bin }],
 
       '+': [[13, 13], { led: bin, nud: post(15) }],
       '-': [[13, 13], { led: bin, nud: post(15) }],
 
-      '*': [[14, 14], { led: bin }],
+      '*': [[14, 14], { led: bin, nud: post(15) }],
       '/': [[14, 14], { led: bin }],
       '%': [[14, 14], { led: bin }],
       '%%': [[14, 14], { led: bin }],
@@ -121,13 +159,14 @@ export const Parse = createParser(
       '~': [[15, 2], { led: pre, nud: post(15) }],
       // '#': [[15, 2], { led: pre, nud: post(15) }],
       '.': [[15, 2], { led: pre, nud: post(15) }],
+      '\'': [[15, 2], { led: pre, nud: post(15) }],
       '**': [[15, 15], { led: bin }],
 
       '++': [
         [16, 2],
         {
           led: (t, _, x) => [t.as('='), x, [t.as('+'), x, t.as('1', 'num')]],
-          nud: t => {
+          nud: (t) => {
             const x = expr(15)
             return [t.as('='), x, [t.as('+'), x, t.as('1', 'num')]]
           },
@@ -137,19 +176,22 @@ export const Parse = createParser(
         [16, 2],
         {
           led: (t, _, x) => [t.as('='), x, [t.as('-'), x, t.as('1', 'num')]],
-          nud: t => {
+          nud: (t) => {
             const x = expr(15)
             return [t.as('='), x, [t.as('-'), x, t.as('1', 'num')]]
           },
         },
       ],
       '{': [[16, 0], { nud: until('}', 0, (t, _, x) => [t, x]) }],
-      '[': [[16, 16], { led: until(']', 0, (t, L, R) => [t, L, R]) }],
+      '[': [[16, 16], {
+        led: until(']', 0, (t, L, R) => [t, L, R]),
+        nud: until(']', 0, (t, _, x) => [t, x]),
+      }],
       '(': [[16, 0], {
         led: until(')', 0, (t, L, R) => [t.as('@'), L, R].filter(Boolean)),
         nud: until(')', 0, (_, __, x) => x),
       }],
-      '::': [[17, 16], { led: bin }],
+      '::': [[18, 16], { led: ternary(':', 17) }],
     }
   }
 )

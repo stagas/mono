@@ -1,13 +1,18 @@
+// @env browser
 import { compile } from '../src/compiler'
 import { parse } from '../src/parser'
 import { S, S0 } from '../src/sexpr'
 
+const default_global = { global_mem_ptr: 'i32' }
 // helpers
 // const deepToString = (x: string | SExpr): string | SExpr => (Array.isArray(x) ? x.map(deepToString) : '' + x)
 // const func = (sym: string, s: string) => deepToString([...compile(parse(s)).funcs[sym].body!])
-const fc = (sym: string, s: string, global?: any) => S(compile(parse(s), global).funcs[sym].body!)
-const c = (s: string, global?: any) => fc('__begin__', s, global)
-const bodyOf = (s: string) => S(compile(parse(s)).body)
+const fc = (sym: string, s: string, global: any = default_global) =>
+  S(compile(parse(s), global).funcs[sym].body!)
+const c = (s: string, global: any = default_global) =>
+  fc('__begin__', s, global)
+const bodyOf = (s: string, global: any = default_global) =>
+  S(compile(parse(s), global).body)
 
 describe('compile', () => {
   // it('literal', () => {
@@ -78,7 +83,7 @@ describe('compile', () => {
   })
 
   it('function declaration with exported arguments', () => {
-    const mod = compile(parse('a(.b=1)=1'))
+    const mod = compile(parse('a(\'b=1)=1'))
     const ctx = mod.funcs.a.context
     expect(ctx.params).toMatchSnapshot()
   })
@@ -283,6 +288,10 @@ describe('compile', () => {
     expect(c('1||2.5||3')).toMatchSnapshot()
   })
 
+  it('x||y logical Or quirky', () => {
+    expect(bodyOf('f()=(a=-2f;a<-1||a>1?1:0)')).toMatchSnapshot()
+  })
+
   it('x==y equality', () => {
     expect(c('1==2')).toMatchSnapshot()
     expect(c('1.2==2.2')).toMatchSnapshot()
@@ -405,6 +414,22 @@ describe('compile', () => {
       expect(fc('f', 'f()=(#:4;0.0)')).toMatchSnapshot()
     })
 
+    it('expression', () => {
+      expect(c('#foo:(3+4)')).toMatchSnapshot()
+    })
+
+    it('float expression', () => {
+      expect(c('#foo:(3.5+4.5)')).toMatchSnapshot()
+    })
+
+    it('fn call expression', () => {
+      expect(bodyOf('fn(x)=3.5+x;#foo:(fn(4.5))')).toMatchSnapshot()
+    })
+
+    it('pass reference', () => {
+      expect(bodyOf('fn(#x)=#x;f()=(#x:1; fn(*#x); 0)')).toMatchSnapshot()
+    })
+
     it('read', () => {
       expect(fc('f', 'f()=(#:4;#(2))')).toMatchSnapshot()
     })
@@ -428,8 +453,10 @@ describe('compile', () => {
     })
 
     it('map/call/reduce', () => {
-      expect(() => fc('f', 'add(a,b)=(a+b);f()=(#:4,2;#=(2,3);foo::add)')).toThrow('must be a buffer')
-      expect(fc('f', 'add(a,b)=(a+b);f()=(#:4,2;#=(2,3);#::add*555)')).toMatchSnapshot()
+      expect(() => fc('f', 'add(a,b)=(a+b);f()=(#:4,2;#=(2,3);foo::add:add)'))
+        .toThrow('must be a buffer')
+      expect(fc('f', 'add(a,b)=(a+b);f()=(#:4,2;#=(2,3);#::add:add*555)'))
+        .toMatchSnapshot()
     })
 
     it('function with internal buffer', () => {
@@ -439,11 +466,17 @@ describe('compile', () => {
 
   describe('quirky cases', () => {
     it('works', () => {
-      expect(bodyOf('a(.x)=x;f()=a()')).toMatchSnapshot()
+      expect(bodyOf('a(\'x)=x;f()=a()')).toMatchSnapshot()
     })
 
     it('negate then convert', () => {
       expect(bodyOf('f()=(-1+1.0)')).toMatchSnapshot()
+    })
+  })
+
+  describe('keywords', () => {
+    it('while', () => {
+      expect(c('i=0;while i<5 i++;i')).toMatchSnapshot()
     })
   })
 })

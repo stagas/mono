@@ -1,3 +1,4 @@
+// @env browser
 import { parse } from '../src/parser'
 import { S0 } from '../src/sexpr'
 import { flatten } from '../src/util'

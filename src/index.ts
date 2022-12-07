@@ -1,5 +1,5 @@
 export * from './compiler'
-export * from './linker'
+export * from './get-shared-worker-port'
+export * from './linker-service'
 export * from './parser'
 export * from './syntax'
-export * from './vm'

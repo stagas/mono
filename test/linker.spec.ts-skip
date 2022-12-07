@@ -1,3 +1,4 @@
+// @env browser
 import * as libvm from '../src/lib/vm'
 import * as libwat from '../src/lib/wat'
 import { Linker } from '../src/linker'

@@ -1,9 +1,10 @@
 {
   "indentWidth": 2,
   "incremental": true,
+  "lineWidth": 80,
   "typescript": {
     "arguments.trailingCommas": "never",
-    "arrowFunction.useParentheses": "preferNone",
+    "arrowFunction.useParentheses": "force",
     "commentLine.forceSpaceAfterSlashes": false,
     "jsx.quoteStyle": "preferDouble",
     "quoteProps": "asNeeded",

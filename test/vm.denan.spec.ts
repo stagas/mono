@@ -1,4 +1,5 @@
-import { VM } from '../src/vm'
+// @env browser
+import { VM } from '../src'
 
 describe('VM denan', () => {
   describe('memory', async () => {
