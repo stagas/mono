@@ -1,6 +1,6 @@
 import { cheapRandomId, checksum, Deferred } from 'everyday-utils'
 import type * as libvm from './lib/vm'
-import type { ExportParam } from './linker-worker'
+import type { ExportParam, PostData } from './linker-worker'
 
 import { Token, TokenJson } from 'lexer-next'
 
@@ -17,6 +17,7 @@ import {
 interface ModuleResponse {
   module: WebAssembly.Module
   params: ExportParam[]
+  accessTime: number
 }
 
 interface Task {
@@ -24,6 +25,7 @@ interface Task {
   deferred: Deferred<ModuleResponse>
 }
 
+const MAX_MODULE_RESPONSES = 30
 const cachedModuleResponses = new Map<number, ModuleResponse>()
 
 export type InstanceExports =
@@ -112,7 +114,7 @@ export class VM {
   setPort(port: MessagePort) {
     this.port = port
 
-    port.onmessage = async ({ data }) => {
+    port.onmessage = async ({ data }: { data: PostData }) => {
       const task = pending.get(data.id)
 
       if (!task) {
@@ -131,8 +133,9 @@ export class VM {
           const moduleResponse = {
             module,
             params: data.params as ExportParam[],
+            accessTime: Date.now()
           }
-          cachedModuleResponses.set(data.checksum, moduleResponse)
+          cachedModuleResponses.set(task.checksum, moduleResponse)
           task.deferred.resolve(moduleResponse)
         } catch (error) {
           task.deferred.reject(error as Error)
@@ -384,15 +387,20 @@ export class VM {
   code?: string
 
   async link(code: string) {
-    const deferred = Deferred<{
-      module: WebAssembly.Module
-      params: ExportParam[]
-    }>()
+    const deferred = Deferred<ModuleResponse>()
 
     const moduleChecksum = checksum(code)
     if (cachedModuleResponses.has(moduleChecksum)) {
-      deferred.resolve(cachedModuleResponses.get(moduleChecksum)!)
+      const moduleResponse = cachedModuleResponses.get(moduleChecksum)!
+      moduleResponse.accessTime = Date.now()
+      deferred.resolve(moduleResponse)
       return deferred.promise
+    }
+
+    if (cachedModuleResponses.size > MAX_MODULE_RESPONSES) {
+      const [lruKey] = [...cachedModuleResponses].sort(([, a], [, b]) => a.accessTime - b.accessTime)[0]
+
+      cachedModuleResponses.delete(lruKey)
     }
 
     const id = cheapRandomId()

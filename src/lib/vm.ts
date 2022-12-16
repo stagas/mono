@@ -62,6 +62,12 @@ export interface VM {
     end: number,
     ...args: number[]
   ): void
+
+  midi_in?(
+    op: number,
+    x: number,
+    y: number
+  ): void
 }
 
 // export const reset_mem = (

@@ -1,6 +1,6 @@
 // @env browser
 import { S } from '../src/sexpr'
-import { CHANNEL_BYTES, MEM_PADDING, VM } from '../src/vm'
+import { CHANNEL_BYTES, MEM_PADDING, VM } from '../src'
 
 const run = async (code: string) => {
   const vm = new VM()

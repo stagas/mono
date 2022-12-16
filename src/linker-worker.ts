@@ -24,6 +24,17 @@ import {
   samplePointers,
 } from './config'
 
+export type PostData = {
+  success: true,
+  id: string,
+  binary: Uint8Array,
+  params: ExportParam[]
+} | {
+  success: false,
+  id: string,
+  error: Error,
+}
+
 // const copy = rfdc({ proto: true, circles: false })
 
 const copy = (x: any) =>
@@ -278,15 +289,22 @@ self.onconnect = ({ ports: [port] }) => {
             })
           ).flat(Infinity)
 
-        port.postMessage({
+        const postData: {
+          success: boolean,
+          id: string,
+          binary: Uint8Array,
+          params: ExportParam[]
+        } = {
           success: true,
           id: data.id,
           binary,
           params,
-        }, [binary.buffer])
+        }
+        port.postMessage(postData, [binary.buffer])
       } catch (error) {
         port.postMessage({ id: data.id, error })
       }
     }
   }
 }
+
