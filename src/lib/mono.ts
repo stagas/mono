@@ -34,13 +34,13 @@ clamp05(x)=(x > 0.5 ? 0.5 : x);
 clamp1(x)=(x > 1f ? 1f : x);
 clamp11(x)=(x > 1f ? 1f : x < -1f ? -1f : x);
 
-osc(x)=({p};s=p;{p}=(p+pi2*x/sr)%pi2;s);
+osc(x,t)=({p};s=t?0f:p;{p}=(s+pi2*x/sr)%pi2;s);
 tri(x)=1f-abs(1f-(((osc(x)+hpi)/pi)%2f))*2f;
 saw(x)=1f-(((osc(x)+pi)/pi)%2f);
 ramp(x)=   (((osc(x)+pi)/pi)%2f)-1f;
 sqr(x)=ramp(x)<0f?-1f:1f;
 \ noise()=rand(); \sin(osc(x)*1e7+1e7);
-sine(x)= sin(osc(x));
+sine(x,t)= sin(osc(x,t));
 expo(x)=(
   {p};
   s=p;

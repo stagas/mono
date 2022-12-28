@@ -33,6 +33,7 @@ export const env = ({
   (global $sr (export "sampleRate") (mut f32) (f32.const 44100.0))
   (global $nyq (export "nyquistFreq") (mut f32) (f32.const 22050.0))
   (global $t (export "currentTime") (mut f32) (f32.const 0))
+  (global $t64 (mut f64) (f64.const 0))
   (global $pi (f32) (f32.const 3.1415927410125732))
   (global $pi2 (f32) (f32.const 6.2831854820251465))
   (global $tau (f32) (f32.const 6.2831854820251465))
@@ -188,7 +189,7 @@ export const fill = (
     (local $user_mem_ptr i32)
     (local $buffer_ptr i32)
     (local $sample f32)
-    (local $sample_time f32)
+    (local $sample_time f64)
 
     (local.set $start_mem_ptr (i32.add
       (i32.const ${memPadding})
@@ -200,9 +201,17 @@ export const fill = (
       (local.get $start_mem_ptr))
     )
 
-    (local.set $sample_time (f32.div (f32.const 1.0) (global.get $sr)))
+    (local.set $sample_time (f64.div (f64.const 1.0)
+      (f64.promote_f32 (global.get $sr))
+    ))
 
-    (global.set $t (f32.div (f32.convert_i32_s (local.get $frame)) (global.get $sr)))
+    (; local.set $frame (i32.add (local.get $frame) (i32.const 0xffffffff)) ;)
+
+    (global.set $t64 (f64.div (f64.convert_i32_s (local.get $frame))
+      (f64.promote_f32 (global.get $sr))
+    ))
+
+    (global.set $t (f32.demote_f64 (global.get $t64)))
 
     (global.set $ch (local.get $channel))
 
@@ -283,8 +292,9 @@ export const fill = (
         )
       )
 
-      ;; $t += $sample_time
-      (global.set $t (f32.add (global.get $t) (local.get $sample_time)))
+      ;; $t64 += $sample_time
+      (global.set $t64 (f64.add (global.get $t64) (local.get $sample_time)))
+      (global.set $t (f32.demote_f64 (global.get $t64)))
 
       ;; $offset++
       (local.set $offset (i32.add (local.get $offset) (i32.const 1)))

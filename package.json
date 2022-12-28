@@ -3,7 +3,7 @@
   "author": "stagas",
   "short": "stagas/mono",
   "description": "mono is a low level language for audio expressions that compiles to wasm",
-  "version": "3.0.1",
+  "version": "3.1.0",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -87,7 +87,7 @@
   },
   "dependencies": {
     "decarg": "^1.3.0",
-    "everyday-utils": "^1.5.0",
+    "everyday-utils": "^1.6.0",
     "json-objectify": "^1.0.1",
     "lexer-next": "^4.0.1",
     "rfdc": "^1.3.0",
