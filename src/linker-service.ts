@@ -295,6 +295,8 @@ export class VM {
   exportEntries: Record<string, number> = {}
 
   async setCode(code: string) {
+    code = !code.trim() ? 'f()=0' : code
+
     if (this.isReady) {
       for (
         const [key, global] of Object.entries(this.exports)
