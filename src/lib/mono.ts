@@ -454,6 +454,89 @@ apf(
   all
 );
 
+\ https://github.com/mixxxdj/mixxx/blob/main/src/engine/filters/enginefiltermoogladder4.h
+
+tanha(x)=(
+  x/(1f+x*x/(3f+x*x/5f))
+);
+
+moog_ig(x0,
+  cut[0.1f..5k]=629.345,
+  q[.1..4f]=0.706
+)=(
+  {m_azt1,
+  m_azt2,
+  m_azt3,
+  m_azt4,
+  m_az5,
+  m_amf};
+
+  kVt = 1.2f;
+
+  v2 = 2f + kVt;
+  kfc = cut / sr;
+  kf = kfc;
+
+  kfcr = 1.8730f * (kfc * kfc * kfc) + 0.4955f * (kfc * kfc) -
+                0.6490f * kfc + 0.9988f;
+
+  x = -2.0f * pi * kfcr * kf;
+  exp_out  = exp(x);
+  m_k2vgNew = v2 * (1f - exp_out);
+  m_kacrNew = q * (-3.9364f * (kfc * kfc) + 1.8409f * kfc + 0.9968f);
+  m_postGainNew = 1.0001784074555027f + (0.9331585678097162f * q);
+
+  m_postGain = m_postGainNew;
+  m_kacr = m_kacrNew;
+  m_k2vg = m_k2vgNew;
+
+  x1 = x0 - m_amf * m_kacr;
+  az1 = m_azt1 + m_k2vg * tanha(x1 / v2);
+  at1 = m_k2vg * tanha(az1 / v2);
+  {m_azt1} = az1 - at1;
+  az2 = m_azt2 + at1;
+  at2 = m_k2vg * tanha(az2 / v2);
+  {m_azt2} = az2 - at2;
+  az3 = m_azt3 + at2;
+  at3 = m_k2vg * tanha(az3 / v2);
+  {m_azt3} = az3 - at3;
+  az4 = m_azt4 + at3;
+  at4 = m_k2vg * tanha(az4 / v2);
+  {m_azt4} = az4 - at4;
+
+  {m_amf} = az4;
+
+  (x1,az3,az4,m_amf,m_postGain)
+);
+
+mooglp(
+  x0,
+  cut[0.1f..5k]=629.345,
+  q[.1..4f]=0.706
+)=(
+  (x1,az3,az4,m_amf,m_postGain)=moog_ig(x0,cut,q);
+  m_amf * m_postGain
+);
+
+\ same as above
+moog(
+  x0,
+  cut[0.1f..5k]=629.345,
+  q[.1..4f]=0.706
+)=(
+  (x1,az3,az4,m_amf,m_postGain)=moog_ig(x0,cut,q);
+  m_amf * m_postGain
+);
+
+mooghp(
+  x0,
+  cut[0.1f..5k]=629.345,
+  q[.1..4f]=0.706
+)=(
+  (x1,az3,az4,m_amf,m_postGain)=moog_ig(x0,cut,q);
+  (x1 - 3 * az3 + 2 * az4) * m_postGain
+);
+
 \ fract(x)=x-floor(x);
 
 cubic(#,i)=(
