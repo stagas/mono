@@ -1,7 +1,7 @@
 
 
 <h1>
-monolang <a href="https://npmjs.org/package/monolang"><img src="https://img.shields.io/badge/npm-v3.1.1-F00.svg?colorA=000"/></a> <a href="src"><img src="https://img.shields.io/badge/loc-6,906-FFF.svg?colorA=000"/></a> <a href="https://cdn.jsdelivr.net/npm/monolang@3.1.1/dist/monolang.min.js"><img src="https://img.shields.io/badge/brotli-11.2K-333.svg?colorA=000"/></a> <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-F0B.svg?colorA=000"/></a>
+monolang <a href="https://npmjs.org/package/monolang"><img src="https://img.shields.io/badge/npm-v3.2.0-F00.svg?colorA=000"/></a> <a href="src"><img src="https://img.shields.io/badge/loc-6,975-FFF.svg?colorA=000"/></a> <a href="https://cdn.jsdelivr.net/npm/monolang@3.2.0/dist/monolang.min.js"><img src="https://img.shields.io/badge/brotli-11.2K-333.svg?colorA=000"/></a> <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-F0B.svg?colorA=000"/></a>
 </h1>
 
 <p></p>
