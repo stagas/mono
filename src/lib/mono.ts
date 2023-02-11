@@ -33,12 +33,15 @@ clampi(x=0,xmin=0,xmax=1)=(
 clamp05(x)=(x > 0.5 ? 0.5 : x);
 clamp1(x)=(x > 1f ? 1f : x);
 clamp11(x)=(x > 1f ? 1f : x < -1f ? -1f : x);
+clamp01(x)=(x > 1f ? 1f : x < 0f ? 0f : x);
+
+norm(x)=clamp01(x*0.5+0.5);
 
 osc(x,t)=({p};s=t?0f:p;{p}=(s+pi2*x/sr)%pi2;s);
-tri(x)=1f-abs(1f-(((osc(x)+hpi)/pi)%2f))*2f;
-saw(x)=1f-(((osc(x)+pi)/pi)%2f);
-ramp(x)=   (((osc(x)+pi)/pi)%2f)-1f;
-sqr(x)=ramp(x)<0f?-1f:1f;
+tri(x,t)=1f-abs(1f-(((osc(x,t)+hpi)/pi)%2f))*2f;
+saw(x,t)=1f-(((osc(x,t)+pi)/pi)%2f);
+ramp(x,t)=   (((osc(x,t)+pi)/pi)%2f)-1f;
+sqr(x,t)=ramp(x,t)<0f?-1f:1f;
 \ noise()=rand(); \sin(osc(x)*1e7+1e7);
 sine(x,t)= sin(osc(x,t));
 expo(x)=(
@@ -747,6 +750,17 @@ env(
   r[0.1..100]=15  \ release
 )=(
   dt=t-note_on_time; \ time since note_on_time
+  A=1-wexp(-dt*a); \ attack curve
+  R=wexp(-dt*r);   \ release curve
+  A*R
+);
+
+envco(
+  note_on_time,
+  a[0.1..100]=15, \ attack
+  r[0.1..100]=15  \ release
+)=(
+  dt=(t-note_on_time)/co; \ time since note_on_time
   A=1-wexp(-dt*a); \ attack curve
   R=wexp(-dt*r);   \ release curve
   A*R
