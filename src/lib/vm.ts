@@ -34,6 +34,8 @@ export const env = ({
   (global $nyq (export "nyquistFreq") (mut f32) (f32.const 22050.0))
   (global $t (export "currentTime") (mut f32) (f32.const 0))
   (global $t64 (mut f64) (f64.const 0))
+  (global $coeff64 (export "coeff") (mut f64) (f64.const 1.0))
+  (global $co (mut f32) (f32.const 1.0))
   (global $pi (f32) (f32.const 3.1415927410125732))
   (global $pi2 (f32) (f32.const 6.2831854820251465))
   (global $tau (f32) (f32.const 6.2831854820251465))
@@ -201,16 +203,23 @@ export const fill = (
       (local.get $start_mem_ptr))
     )
 
+    (; sample_time = 1.0 / sampleRate ;)
     (local.set $sample_time (f64.div (f64.const 1.0)
       (f64.promote_f32 (global.get $sr))
     ))
 
+    (; userland coefficient ;)
+    (global.set $co (f32.demote_f64 (global.get $coeff64) ))
+
+    (; DON'T DELETE NEXT LINE: used for troubleshooting frame/time issues ;)
     (; local.set $frame (i32.add (local.get $frame) (i32.const 0xffffffff)) ;)
 
+    (; t64 = frame / sampleRate ;)
     (global.set $t64 (f64.div (f64.convert_i32_s (local.get $frame))
       (f64.promote_f32 (global.get $sr))
     ))
 
+    (; userland time ;)
     (global.set $t (f32.demote_f64 (global.get $t64)))
 
     (global.set $ch (local.get $channel))
