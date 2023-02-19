@@ -366,25 +366,43 @@ export const opTables = (mod: Module) => {
                       const sym = local.scope.add(Type.f32, id)
                       // console.log(sym.id, sym.type)
 
-                      if (!(sym.id in local.offsets)) {
+                      if (!local.scope.has(`${id}_ptr`)) {
+                        const sym_ptr = local.scope.add(Type.i32, `${id}_ptr`)
+                        const op = sym_ptr.set(
+                          local_mem_ptr.tee(
+                            i32.add(
+                              local_mem_ptr.get(),
+                              i32.const(4)
+                            )
+                          )
+                        )
+                        // const sym = local.scope.add(typeOf(op), id)
+                        // return sym.set(op)
+
+                        result.unshift(op)
+
+                        // )
+                        // if (!(sym.id in local.offsets)) {
                         // result.push(local_mem_ptr.set(global_mem_ptr.get()))
                         added++
 
-                        const current = Object.keys(local.offsets).length
-                        local.offsets[sym.id] = current << 2
+                        // const current = Object.keys(local.offsets).length
+                        // local.offsets[sym.id] = current << 2
                       }
                       // const offset = local.offsets[sym.id]
                       // console.log(typeOf(last[i]))
                       result.push([
+                        // op,
                         sym.set(typeAs(typeOf(last[i]), [])),
                       ])
                       return typeAs(Type.none, result)
                     }).reverse().concat(vars.map((id) => {
                       const { sym } = local.scope.ensure_sym(id)
-                      const offset = local.offsets[sym.id]
+                      const { sym: sym_ptr } = local.scope.ensure_sym(`${id}_ptr`)
+                      // const offset = local.offsets[sym.id]
                       return typeAs(Type.none, [
-                        `f32.store offset=${offset}`,
-                        local_mem_ptr.get(),
+                        'f32.store',
+                        sym_ptr.get(),
                         cast(Type.f32, denan(sym.get())),
                       ])
                     })), // consume stack in reverse
@@ -394,10 +412,11 @@ export const opTables = (mod: Module) => {
                       local_mem_ptr.set(global_mem_ptr.get())
                     )
                     result.push(global_mem_ptr.set(
-                      i32.add(
-                        i32.const(added << 2),
-                        global_mem_ptr.get()
-                      )
+                      local_mem_ptr.get()
+                      // i32.add(
+                      //   i32.const(added << 2),
+                      //   global_mem_ptr.get()
+                      // )
                     ))
                   }
                   // console.log(S(result))
@@ -406,14 +425,14 @@ export const opTables = (mod: Module) => {
                   const v = vars[0] as unknown as string
                   return typeAs(Type.none, [
                     local.build(rhs, ops), // function call
-                    [`f32.store offset=${local.offsets[v]}`, [
+                    [`f32.store`, [
                       'local.get',
-                      '$local_mem_ptr',
+                      `$${v}_ptr`,
                     ], [
-                      'local.tee',
-                      '$' + v,
-                      cast(Type.f32, denan([])),
-                    ]],
+                        'local.tee',
+                        '$' + v,
+                        cast(Type.f32, denan([])),
+                      ]],
                   ])
                 } else {
                   throw new CompilerError(
@@ -437,8 +456,8 @@ export const opTables = (mod: Module) => {
               return typeAs(
                 Type.none,
                 vars.map((sym: Token | string, i) => [
-                  `f32.store offset=${local.offsets[sym as string]}`,
-                  ['local.get', '$local_mem_ptr'],
+                  'f32.store',
+                  ['local.get', `$${sym}_ptr`],
                   ['local.tee', '$' + sym, cast(Type.f32, denan(vals[i]))],
                 ])
               )
@@ -752,13 +771,19 @@ export const opTables = (mod: Module) => {
           const global_mem_ptr = global.scope.ensure_sym('global_mem_ptr').sym
 
           const vars = (<Token[]>flatten(',', rhs)).map((id: Token, i) => {
-            const offset = i << 2
+            const sym_ptr = local.scope.add(Type.i32, `${id}_ptr`)
             const op = typeAs(Type.f32, [
-              `f32.load offset=${offset}`,
-              cast(Type.i32, local_mem_ptr.get()),
+              'f32.load',
+              sym_ptr.tee(
+                local_mem_ptr.tee(
+                  i32.add(
+                    local_mem_ptr.get(),
+                    i32.const(4)
+                  )
+                )
+              )
             ])
             const sym = local.scope.add(typeOf(op), id)
-            local.offsets[sym.id] = offset
             return sym.set(op)
           })
           // dprint-ignore
@@ -767,12 +792,12 @@ export const opTables = (mod: Module) => {
             local_mem_ptr.set(global_mem_ptr.get()),
             ...vars,
             // advance the global memory pointer
-            global_mem_ptr.set(
-              i32.add(
-                i32.const(vars.length << 2),
-                global_mem_ptr.get()
-              )
-            )
+            global_mem_ptr.set(local_mem_ptr.get())
+            //   i32.add(
+            //     i32.const(vars.length << 2),
+            //     global_mem_ptr.get()
+            //   )
+            // )
           ]
         },
     '[': todo,

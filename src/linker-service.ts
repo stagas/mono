@@ -1,22 +1,19 @@
 import { cheapRandomId, checksum, Deferred } from 'everyday-utils'
-import type * as libvm from './lib/vm'
-import type { ExportParam, PostData } from './linker-worker'
-
 import { Token, TokenJson } from 'lexer-next'
+import type * as libvm from './lib/vm'
+import type { ExportParam, LinkerWorkerRequest, LinkerWorkerResponse } from './linker-worker'
 
 import {
-  CHANNEL_BYTES,
-  config as defaultConfig,
-  EVENTS,
-  MEM_PADDING,
-  memory,
-  PAGE_BYTES,
-  sampleBufferSizes,
-} from './config'
+  BYTES_EVENTS, BYTES_PADDING, channelsPtr, MAX_CHANNELS, MAX_SIZE_BLOCK, memory, SAMPLE_CHANNELS, SAMPLE_MAX_COUNT, SAMPLE_SIZES
+} from './const'
+
+import { config as defaultConfig } from './config'
 
 interface ModuleResponse {
   module: WebAssembly.Module
   params: ExportParam[]
+  inputChannels: number
+  outputChannels: number
   accessTime: number
 }
 
@@ -79,6 +76,7 @@ export interface MonoBuffer extends Float32Array {
   pos: number
   size: number
   structData: Int32Array
+  bufferSize: number
 }
 
 export class VM {
@@ -86,6 +84,8 @@ export class VM {
   memory: WebAssembly.Memory
   instance?: WebAssembly.Instance
   params: MonoParam[] = []
+  inputChannels = 0
+  outputChannels = 1
 
   floats!: Float32Array
   ints!: Int32Array
@@ -106,7 +106,6 @@ export class VM {
 
   constructor(public config: typeof defaultConfig = { ...defaultConfig }) {
     this.memory = new WebAssembly.Memory(memory)
-    console.log(this.memory)
     this.makeSampleBuffers()
     this.makeFloats()
   }
@@ -114,7 +113,7 @@ export class VM {
   setPort(port: MessagePort) {
     this.port = port
 
-    port.onmessage = async ({ data }: { data: PostData }) => {
+    port.onmessage = async ({ data }: { data: LinkerWorkerResponse }) => {
       const task = pending.get(data.id)
 
       if (!task) {
@@ -130,9 +129,11 @@ export class VM {
           //   env: { memory: task.owner.memory },
           // })).instance
           const module = await WebAssembly.compile(data.binary)
-          const moduleResponse = {
+          const moduleResponse: ModuleResponse = {
             module,
             params: data.params as ExportParam[],
+            inputChannels: data.inputChannels,
+            outputChannels: data.outputChannels,
             accessTime: Date.now()
           }
           cachedModuleResponses.set(task.checksum, moduleResponse)
@@ -146,30 +147,30 @@ export class VM {
     }
   }
 
-  setNumberOfChannels(numberOfChannels: number) {
-    const diff = numberOfChannels - this.inputs.length
-    if (diff > 0) {
-      console.log(
-        'memory grow by',
-        diff,
-        'channels. was:',
-        this.config.channels,
-        'now:',
-        numberOfChannels
-      )
-      // console.log(this.code)
-      this.memory.grow(Math.ceil((diff * CHANNEL_BYTES) / PAGE_BYTES))
-      this.config.channels = numberOfChannels
-      this.makeSampleBuffers()
-      this.makeFloats()
-      this.setCode(this.code!)
-    }
-    // if (diff) {
-    // for (let i = 0; i < this.inputs.length; i++) {
-    //   this.inputs[i].fill(0)
-    // }
-    // }
-  }
+  // setNumberOfChannels(numberOfChannels: number) {
+  //   const diff = numberOfChannels - this.inputs.length
+  //   if (diff > 0) {
+  //     console.log(
+  //       'memory grow by',
+  //       diff,
+  //       'channels. was:',
+  //       this.config.config.channels,
+  //       'now:',
+  //       numberOfChannels
+  //     )
+  //     // console.log(this.code)
+  //     this.memory.grow(Math.ceil((diff * BYTES_CHANNEL) / BYTES_PAGE))
+  //     this.config.config.channels = numberOfChannels
+  //     this.makeSampleBuffers()
+  //     this.makeFloats()
+  //     this.setCode(this.code!)
+  //   }
+  //   // if (diff) {
+  //   // for (let i = 0; i < this.inputs.length; i++) {
+  //   //   this.inputs[i].fill(0)
+  //   // }
+  //   // }
+  // }
 
   createMonoBuffer(id: string, pos: number, size: number) {
     const structData = new Int32Array(this.memory.buffer, pos, 5)
@@ -182,13 +183,14 @@ export class VM {
       size * Float32Array.BYTES_PER_ELEMENT,
     ])
 
+    const bufferSize = size + 5
     const monoBuffer = Object.assign(
       new Float32Array(
         this.memory.buffer,
         pos + 5 * Int32Array.BYTES_PER_ELEMENT,
         size
       ),
-      { id, pos, size, structData }
+      { id, pos, size, structData, bufferSize }
     ) as MonoBuffer
 
     this.monoBuffers.set(id, monoBuffer)
@@ -197,55 +199,46 @@ export class VM {
   }
 
   makeSampleBuffers() {
-    const { sampleCount, sampleChannels } = this.config
-
-    const sizes = sampleBufferSizes
+    const sizes = SAMPLE_SIZES
 
     this.samples = Array.from(
-      { length: sampleCount },
-      () => Array.from({ length: sampleChannels })
+      { length: SAMPLE_MAX_COUNT },
+      () => Array.from({ length: SAMPLE_CHANNELS })
     )
 
-    // start where the input/output channels end
-    const startPos = MEM_PADDING + EVENTS
+    let pos = BYTES_PADDING + BYTES_EVENTS
 
-    for (let i = 0; i < sampleCount; i++) {
+    let buffer: MonoBuffer
+
+    for (let i = 0; i < SAMPLE_MAX_COUNT; i++) {
       this.samples[i] = []
 
-      for (let c = 0; c < sampleChannels; c++) {
-        const pos = startPos + (
-          (i * sizes.one + c * sizes.channel)
-          * Float32Array.BYTES_PER_ELEMENT
-        )
-
-        this.samples[i][c] = this.createMonoBuffer(
+      for (let c = 0; c < SAMPLE_CHANNELS; c++) {
+        buffer = this.samples[i][c] = this.createMonoBuffer(
           `s${i}_${c}`,
           pos,
           sizes.channel - 5
         )
+        pos += buffer.bufferSize << 2
       }
     }
   }
 
   makeFloats() {
-    const { channels, blockSize } = this.config
-
     this.floats = new Float32Array(this.memory.buffer)
     this.ints = new Int32Array(this.memory.buffer)
-    this.inputs = Array.from({ length: channels })
-    this.outputs = Array.from({ length: channels })
+    this.inputs = Array.from({ length: MAX_CHANNELS })
+    this.outputs = Array.from({ length: MAX_CHANNELS })
 
-    const startPos = MEM_PADDING + EVENTS + sampleBufferSizes.bytes
-      + CHANNEL_BYTES
-    for (let i = 0; i < channels; i++) {
-      const pos = startPos + i * CHANNEL_BYTES
-      this.inputs[i] = this.createMonoBuffer(`i${i}`, pos, blockSize)
-      this.outputs[i] = this.createMonoBuffer(
-        `o${i}`,
-        pos + (blockSize * Float32Array.BYTES_PER_ELEMENT)
-        + (5 * Int32Array.BYTES_PER_ELEMENT),
-        blockSize
-      )
+    // MEM_PADDING + EVENTS + SAMPLES + [INPUT + OUTPUT][] + USER_MEM
+    let pos = channelsPtr
+
+    let buffer: MonoBuffer
+    for (let i = 0; i < MAX_CHANNELS; i++) {
+      buffer = this.inputs[i] = this.createMonoBuffer(`i${i}`, pos, MAX_SIZE_BLOCK)
+      pos += buffer.bufferSize << 2
+      buffer = this.outputs[i] = this.createMonoBuffer(`o${i}`, pos, MAX_SIZE_BLOCK)
+      pos += buffer.bufferSize << 2
     }
   }
 
@@ -307,7 +300,7 @@ export class VM {
       }
     }
 
-    const { module: wasmModule, params } = await this.link(code)
+    const { module: wasmModule, params, inputChannels, outputChannels } = await this.link(code)
 
     this.instance = await WebAssembly.instantiate(wasmModule, {
       env: { memory: this.memory },
@@ -324,7 +317,7 @@ export class VM {
       // @ts-ignore
       this.exports.update_exports()
 
-      this.exports.fill(0, 0, 0, 0)
+      this.exports.fill(0, 0, 0)
       this.exportEntries = {}
       for (
         const [key, global] of Object.entries(this.exports)
@@ -383,6 +376,11 @@ export class VM {
 
     // console.log(this.params)
     this.isReady = true
+
+    return {
+      inputChannels,
+      outputChannels
+    }
   }
 
   isReady = false
@@ -411,14 +409,14 @@ export class VM {
       deferred
     })
 
-    this.port!.postMessage({
+    this.port!.postMessage(<LinkerWorkerRequest>{
       id,
       code,
+      sampleRate: this.config.sampleRate,
       monoBuffers: [...this.monoBuffers].map(([id, monoBuffer]) => [
         id,
         monoBuffer.pos,
       ]),
-      config: this.config,
     })
 
     return deferred.promise

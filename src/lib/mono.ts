@@ -37,13 +37,13 @@ clamp01(x)=(x > 1f ? 1f : x < 0f ? 0f : x);
 
 norm(x)=clamp01(x*0.5+0.5);
 
-osc(x,t)=({p};s=t?0f:p;{p}=(s+pi2*x/sr)%pi2;s);
-tri(x,t)=1f-abs(1f-(((osc(x,t)+hpi)/pi)%2f))*2f;
-saw(x,t)=1f-(((osc(x,t)+pi)/pi)%2f);
-ramp(x,t)=   (((osc(x,t)+pi)/pi)%2f)-1f;
-sqr(x,t)=ramp(x,t)<0f?-1f:1f;
+osc(x,t,o)=({p};s=t?0f:p;{p}=(s+pi2*x/sr)%pi2;s+o);
+tri(x,t,o)=1f-abs(1f-(((osc(x,t,o)+hpi)/pi)%2f))*2f;
+saw(x,t,o)=1f-(((osc(x,t,o)+pi)/pi)%2f);
+ramp(x,t,o)=   (((osc(x,t,o)+pi)/pi)%2f)-1f;
+sqr(x,t,o)=ramp(x,t,o)<0f?-1f:1f;
 \ noise()=rand(); \sin(osc(x)*1e7+1e7);
-sine(x,t)= sin(osc(x,t));
+sine(x,t,o)= sin(osc(x,t,o));
 expo(x)=(
   {p};
   s=p;
@@ -586,19 +586,20 @@ sum(x,y)=x+y;
 idy(x)=x;
 
 daverb(x,
-  pd[1..1s]=1137.95, \ predelay
-  bw[0..1f]=0.402, \ bandwidth
-  fi[0..1f]=0.803, \ input diffusion 1
-  si[0..1f]=0.51, \ input diffusion 2
-  dc[0..1f]=0.43, \ decay
-  ft[0..0.999999]=0.978, \ decay diffusion 1
-  st[0..0.999999]=0.938, \ decay diffusion 2
-  dp[0..1f]=0.427, \ damping
-  ex[0..2f]=0.87, \ excursion rate
-  ed[0..2f]=1.748, \ excursion depth
+  pd[1..1s]=150f, \ predelay
+  bw[0..1f]=0.1, \ bandwidth
+  fi[0..1f]=0.5, \ input diffusion 1
+  si[0..1f]=0.5, \ input diffusion 2
+  dc[0..1f]=0.5, \ decay
+  ft[0..0.999999]=0.5, \ decay diffusion 1
+  st[0..0.999999]=0.5, \ decay diffusion 2
+  dp[0..1f]=0.5, \ damping
+  ex[0..2f]=0.5, \ excursion rate
+  ed[0..2f]=0.5, \ excursion depth
   dr[0..1f]=0, \ dry
   we[0..1f]=1 \ wet
 )=(
+
   \ set parameters
   dp=1-dp;
   ex=ex/sr;
@@ -640,8 +641,8 @@ daverb(x,
   exc2 = ed*(1f+sin(exc_phase*6.2847));
 
   \ left loop
-  #d4=split+dc*#d11(-1)+ft*cubic(*#d4,-exc); \ tank diffuse 1
-  #d5=cubic(*#d4,-exc)-ft*#d4;               \ long delay 1
+  #d4=split+dc*#d11(-1)+ft*cubic(*#d4,exc); \ tank diffuse 1
+  #d5=cubic(*#d4,exc)-ft*#d4;               \ long delay 1
 
   {lp2};{lp2}+=dp*(#d5(-1)-lp2); \ damp 1
 
@@ -649,8 +650,8 @@ daverb(x,
   #d7=#d6(-1)+st*#d6;    \ long delay 2
 
   \ right loop
-  #d8=split+dc*#d7(-1)+ft*cubic(*#d8,-exc2); \ tank diffuse 3
-  #d9=cubic(*#d8,-exc2)-ft*#d8;              \ long delay 3
+  #d8=split+dc*#d7(-1)+ft*cubic(*#d8,exc2); \ tank diffuse 3
+  #d9=cubic(*#d8,exc2)-ft*#d8;              \ long delay 3
 
   {lp3};{lp3}+=dp*#d9(-1)-lp3; \ damp 2
 

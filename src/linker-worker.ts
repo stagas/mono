@@ -13,30 +13,32 @@ import libmono from './lib/mono'
 import * as libvm from './lib/vm'
 import * as libwat from './lib/wat'
 
-import {
-  CHANNEL_BYTES,
-  config,
-  EVENTS,
-  MEM_PADDING,
-  memory,
-  memPadding,
-  sampleBufferSizes,
-  samplePointers,
-} from './config'
+import { eventsPtr, memory, setupPtr } from './const'
+import { memoize } from 'everyday-utils'
 
-export type PostData = {
-  success: true,
-  id: string,
-  binary: Uint8Array,
+export type LinkerWorkerRequest = {
+  id: string
+  code: string
+  monoBuffers: [string, number][]
+  sampleRate: number
+}
+
+export type LinkerWorkerResponse = {
+  success: true
+  id: string
+  binary: Uint8Array
   params: ExportParam[]
+  inputChannels: number
+  outputChannels: number
 } | {
-  success: false,
-  id: string,
-  error: Error,
+  success: false
+  id: string
+  error: Error
 }
 
 // const copy = rfdc({ proto: true, circles: false })
 
+// TODO: structuredClone?
 const copy = (x: any) =>
   deobjectify(
     objectify(x, replacer(x)),
@@ -51,79 +53,84 @@ const copy = (x: any) =>
     ])
   )
 
-const includes: Includes = {}
+const precompile = memoize((sampleRate: number) => {
+  const includes: Includes = {}
+  console.log('precompile', sampleRate)
+  const source = Object.values({
+    env: libvm.env,
+    ...libwat,
+    ...libmath,
+  }).map((x) => (
+    typeof x === 'function'
+      ? x({
+        memory,
+        setupPtr,
+        eventsPtr,
+        sampleRate,
+      })
+      : x
+  )).join('\n')
 
-const source = Object.values({
-  env: libvm.env,
-  ...libwat,
-  ...libmath,
-}).map((x) => (
-  typeof x === 'function'
-    ? x({
-      memory,
-      memPadding,
-      eventsPointer: config.eventsPointer,
-      samplePointers,
-    })
-    : x
-)).join('\n')
-
-const context = wat.compile(
-  wat.parse(wat.tokenize(`(module ${source})`))
-)
-
-// @ts-ignore
-for (const code of context.module.codes) {
-  // @ts-ignore
-  const [params, result] = context.module.types[code.type_idx].split(',')
-  // console.log(code.name, params, result)
-  // if (code.name === 'env.seed') continue
-  includes[code.name] = {
-    params: params.split(' '),
-    result: result.split(' ')[0],
-  }
-}
-
-const scope = Object.fromEntries(
-  context.global.globals.map((x) => [
-    x.name,
-    x.type as Type,
-  ])
-)
-
-const lib = {
-  context,
-  scope,
-  includes,
-  init_body: [] as SExpr,
-  fill_body: [] as SExpr,
-  types: new Map(),
-}
-
-const ast = parse(libmono)
-
-const mod = compile(
-  ast,
-  lib.scope,
-  lib.includes,
-  [],
-  [],
-  lib.types,
-  CompStep.Lib
-)
-
-lib.includes = Object.assign(
-  lib.includes,
-  Object.fromEntries(
-    Object.entries(mod.funcs)
-      .filter(([name]) => !(name in lib.includes))
+  const context = wat.compile(
+    wat.parse(wat.tokenize(`(module ${source})`))
   )
-)
-lib.init_body = mod.init_body!
-lib.fill_body = mod.fill_body
 
-const sexpr = ['module', ...mod.body]
-wat.default(S(sexpr), { metrics: false }, lib.context)
+  // @ts-ignore
+  for (const code of context.module.codes) {
+    // @ts-ignore
+    const [params, result] = context.module.types[code.type_idx].split(',')
+    // console.log(code.name, params, result)
+    // if (code.name === 'env.seed') continue
+    includes[code.name] = {
+      params: params.split(' '),
+      result: result.split(' ')[0],
+    }
+  }
+
+  const scope = Object.fromEntries(
+    context.global.globals.map((x) => [
+      x.name,
+      x.type as Type,
+    ])
+  )
+  console.log('SCOPE', scope)
+
+  const lib = {
+    context,
+    scope,
+    includes,
+    init_body: [] as SExpr,
+    fill_body: [] as SExpr,
+    types: new Map(),
+  }
+
+  const ast = parse(libmono)
+
+  const mod = compile(
+    ast,
+    lib.scope,
+    lib.includes,
+    [],
+    [],
+    lib.types,
+    CompStep.Lib
+  )
+
+  lib.includes = Object.assign(
+    lib.includes,
+    Object.fromEntries(
+      Object.entries(mod.funcs)
+        .filter(([name]) => !(name in lib.includes))
+    )
+  )
+  lib.init_body = mod.init_body!
+  lib.fill_body = mod.fill_body
+
+  const sexpr = ['module', ...mod.body]
+  wat.default(S(sexpr), { metrics: false }, lib.context)
+
+  return { lib }
+})
 
 export interface ExportParam {
   id: TokenJson | (Token & string)
@@ -143,9 +150,12 @@ export interface ExportParam {
 
 // @ts-ignore
 self.onconnect = ({ ports: [port] }) => {
-  port.onmessage = ({ data }: any) => {
+  // TODO: let scope
+  port.onmessage = ({ data }: { data: LinkerWorkerRequest }) => {
     if (data.code) {
       try {
+        const { lib } = precompile(data.sampleRate)
+
         const ast = parse(data.code)
         if (!ast) {
           throw new Error('No ast produced.')
@@ -154,7 +164,10 @@ self.onconnect = ({ ports: [port] }) => {
           throw new Error('No lexer')
         }
 
+        // TODO: copy scope eagerly earlier so that it's available
+        // immediately
         const scope = copy(lib.scope) as any
+
         // console.log(lib)
         const monoBufferGlobals = data.monoBuffers.map((
           [id, pos]: [string, number],
@@ -165,14 +178,21 @@ self.onconnect = ({ ports: [port] }) => {
 
         const fill_body = [...lib.fill_body]
 
-        for (let i = data.config.channels; i < data.config.maxChannels; i++) {
-          scope[`#i${i}`] = Type.i32
-          scope[`#o${i}`] = Type.i32
-          monoBufferGlobals.push(`(global $#i${i} (mut i32) (i32.const 0))`)
-          monoBufferGlobals.push(`(global $#o${i} (mut i32) (i32.const 0))`)
-          fill_body.push([`global.set`, `$#i${i}`, [`global.get`, `$#zero`]])
-          fill_body.push([`global.set`, `$#o${i}`, [`global.get`, `$#zero`]])
-        }
+        // for (let i = data.config.maxCha; i < data.config.maxChannels; i++) {
+        //   scope[`#i${i}`] = Type.i32
+        //   scope[`#o${i}`] = Type.i32
+        //   // point all buffers initially to #zero
+        //   monoBufferGlobals.push(`(global $#i${i} (mut i32) (i32.const 0))`)
+        //   monoBufferGlobals.push(`(global $#o${i} (mut i32) (i32.const 0))`)
+        //   fill_body.push([`global.set`, `$#i${i}`, [`global.get`, `$#zero`]])
+        //   fill_body.push([`global.set`, `$#o${i}`, [`global.get`, `$#zero`]])
+        // }
+
+        const inputChannels = data.code.includes('#i1')
+          ? 2
+          : data.code.includes('#i0')
+            ? 1
+            : 0
 
         const mod = compile(
           ast,
@@ -185,20 +205,15 @@ self.onconnect = ({ ports: [port] }) => {
         )
 
         // console.log('MOD IS', mod.global)
+        const outputChannels = mod.f_type === Type.multi ? 2 : 1
 
         const sexpr = [
           'module',
           ...monoBufferGlobals,
           libvm.process(mod),
-          libvm.fill({
-            type: mod.f_type,
-            params: mod.f_params,
-            blockSize: data.config.blockSize,
-            channels: data.config.channels,
-            maxChannels: data.config.maxChannels,
-            channelBytes: CHANNEL_BYTES,
-            memPadding: MEM_PADDING + EVENTS + sampleBufferSizes.bytes
-              + CHANNEL_BYTES,
+          libvm.fill(mod, {
+            inputChannels,
+            outputChannels,
           }),
           ...mod.body,
         ]
@@ -289,16 +304,13 @@ self.onconnect = ({ ports: [port] }) => {
             })
           ).flat(Infinity)
 
-        const postData: {
-          success: boolean,
-          id: string,
-          binary: Uint8Array,
-          params: ExportParam[]
-        } = {
+        const postData: LinkerWorkerResponse = {
           success: true,
           id: data.id,
           binary,
           params,
+          inputChannels,
+          outputChannels,
         }
         port.postMessage(postData, [binary.buffer])
       } catch (error) {

@@ -1,18 +1,19 @@
-import { Arg } from '..'
 import { Module } from '../compiler'
 import { S } from '../sexpr'
-import { Type, Typed, W } from '../typed'
+import { Type, W } from '../typed'
+
+import { userPtr, channelsPtr, SIZE_CHANNEL_IO, SIZE_CHANNEL_ONE } from '../const'
 
 export const env = ({
   memory,
-  memPadding,
-  eventsPointer,
-  // samplePointers,
+  setupPtr,
+  eventsPtr: eventsPointer,
+  sampleRate,
 }: {
   memory: WebAssembly.MemoryDescriptor
-  samplePointers: number[][]
-  eventsPointer: number
-  memPadding: number
+  setupPtr: number
+  eventsPtr: number
+  sampleRate: number
 }) =>
   `;;wasm
   (import "env" "memory"
@@ -23,15 +24,14 @@ export const env = ({
     )
   )
 
-  (global $global_mem_ptr (export "global_mem_ptr") (mut i32) (i32.const ${memPadding}))
-  (global $start_ptr (export "start_ptr") (mut i32) (i32.const 0))
+  (global $global_mem_ptr (export "global_mem_ptr") (mut i32) (i32.const ${setupPtr}))
 
   ;; set the max number of loop iterations per sample
   (global $infinite_loop_guard (mut i32) (i32.const 0))
   (global $max_loop (mut i32) (i32.const 128))
 
-  (global $sr (export "sampleRate") (mut f32) (f32.const 44100.0))
-  (global $nyq (export "nyquistFreq") (mut f32) (f32.const 22050.0))
+  (global $sr (export "sampleRate") (mut f32) (f32.const ${sampleRate}))
+  (global $nyq (export "nyquistFreq") (mut f32) (f32.const ${(sampleRate / 2) | 0}))
   (global $t (export "currentTime") (mut f32) (f32.const 0))
   (global $t64 (mut f64) (f64.const 0))
   (global $coeff64 (export "coeff") (mut f64) (f64.const 1.0))
@@ -54,16 +54,13 @@ export const env = ({
 
 export interface VM {
   process(
-    channels: number,
     events: number,
   ): void
 
   fill(
-    channel: number,
     frame: number,
     offset: number,
     end: number,
-    ...args: number[]
   ): void
 
   midi_in?(
@@ -101,10 +98,8 @@ export interface VM {
 export const process = (mod: Module) =>
   `;;wasm
 (func $process (export "process")
-  (param $channels i32)
   (param $events i32)
 
-  (local $channelsIndex i32)
   (local $eventsIndex i32)
   (local $pos i32)
 
@@ -121,33 +116,19 @@ export const process = (mod: Module) =>
 
     (if (i32.eqz (i32.load offset=0 (local.get $pos)))
       (then
-
-        (local.set $channelsIndex (i32.const 0))
-        (loop $channelsLoop
-          (call $fill (local.get $channelsIndex)
-            (i32.load offset=4 (local.get $pos))
-            (i32.load offset=8 (local.get $pos))
-            (i32.load offset=12 (local.get $pos))
-          )
-          (br_if $channelsLoop (i32.ne
-            (local.tee $channelsIndex (i32.add (i32.const 1) (local.get $channelsIndex)))
-            (local.get $channels)
-          ))
+        (call $fill
+          (i32.load offset=4 (local.get $pos))
+          (i32.load offset=8 (local.get $pos))
+          (i32.load offset=12 (local.get $pos))
         )
-
       )
       (else
-
-        (drop ${S(
-    ('midi_in' in mod.funcs)
-      ? mod.funcCall('midi_in', [
-        mod.typeAs(Type.i32, ['i32.load offset=4', ['local.get', '$pos']]),
-        mod.typeAs(Type.i32, ['i32.load offset=8', ['local.get', '$pos']]),
-        mod.typeAs(Type.i32, ['i32.load offset=12', ['local.get', '$pos']]),
-      ])
-      : ['i32.const', '0']
-  )
-  }
+        (drop ${S(('midi_in' in mod.funcs) ?
+    mod.funcCall('midi_in', [
+      mod.typeAs(Type.i32, ['i32.load offset=4', ['local.get', '$pos']]),
+      mod.typeAs(Type.i32, ['i32.load offset=8', ['local.get', '$pos']]),
+      mod.typeAs(Type.i32, ['i32.load offset=12', ['local.get', '$pos']]),
+    ]) : ['i32.const', '0'])}
         )
       )
     )
@@ -161,47 +142,43 @@ export const process = (mod: Module) =>
 `
 
 export const fill = (
-  { type, params, blockSize, channels, channelBytes, memPadding }: {
-    type: Type
-    params: Arg[]
-    blockSize: number
-    channels: number
-    maxChannels: number
-    channelBytes: number
-    memPadding: number
-  },
+  mod: Module,
+  {
+    inputChannels,
+    outputChannels,
+  }: { inputChannels: number, outputChannels: number },
 ) =>
   `;;wasm
   (func $fill (export "fill")
-    ;; channel
-    (param $channel i32)
     ;; song position starting frame
     (param $frame i32)
     ;; buffer offset
     (param $offset i32)
     ;; buffer end index exclusive
     (param $end i32)
-    ;; ...params
-    ${params.map((x) => `(param $${x.id} ${Typed.max(Type.i32, x.type!)})`).join(
-    ' '
-  )
-  }
 
-    (local $start_mem_ptr i32)
-    (local $user_mem_ptr i32)
-    (local $buffer_ptr i32)
-    (local $sample f32)
     (local $sample_time f64)
 
-    (local.set $start_mem_ptr (i32.add
-      (i32.const ${memPadding})
-      (i32.mul (i32.const ${channelBytes}) (local.get $channel)))
-    )
+    (local $user_mem_ptr i32)
 
-    (local.set $user_mem_ptr (i32.add
-      (i32.const ${((blockSize + 5) * 2) << 2})
-      (local.get $start_mem_ptr))
-    )
+    (local $channels_ptr i32)
+    (local $buffer_ptr i32)
+    (local $sample f32)
+
+    ${mod.f_type === Type.multi ? `;;wasm
+    (local $channels_R_ptr i32)
+    (local $buffer_R_ptr i32)
+    (local $sample_R f32)
+    ` : ''}
+
+    (local.set $channels_ptr (i32.const ${channelsPtr}))
+
+    ${mod.f_type === Type.multi ? `;;wasm
+    (local.set $channels_R_ptr (i32.const ${channelsPtr + (SIZE_CHANNEL_IO << 2)
+    }))
+    ` : ''}
+
+    (local.set $user_mem_ptr (i32.const ${userPtr}))
 
     (; sample_time = 1.0 / sampleRate ;)
     (local.set $sample_time (f64.div (f64.const 1.0)
@@ -221,8 +198,6 @@ export const fill = (
 
     (; userland time ;)
     (global.set $t (f32.demote_f64 (global.get $t64)))
-
-    (global.set $ch (local.get $channel))
 
     (if
       (i32.eq
@@ -244,15 +219,16 @@ export const fill = (
       )
     )
 
-    ${Array.from({ length: channels }, (_, i) =>
-    `;;wasm
-      (i32.store offset=0 (global.get $#i${i}) (i32.const 0))
-      (i32.store offset=4 (global.get $#i${i}) (i32.const 0))
-      (i32.store offset=0 (global.get $#o${i}) (i32.const 0))
-      (i32.store offset=4 (global.get $#o${i}) (i32.const 0))
-      ;; todo: zero out #zero
-    `).join('\n')
-  }
+    ${Array.from({ length: inputChannels }, (_, i) => `;;wasm
+    (i32.store offset=0 (global.get $#i${i}) (i32.const 0))
+    (i32.store offset=4 (global.get $#i${i}) (i32.const 0))
+    ;; todo: zero out #zero
+    `).join('\n')}
+
+    ${Array.from({ length: outputChannels }, (_, i) => `;;wasm
+    (i32.store offset=0 (global.get $#o${i}) (i32.const 0))
+    (i32.store offset=4 (global.get $#o${i}) (i32.const 0))
+    `).join('\n')}
 
     ;; do
     (loop $loop
@@ -268,25 +244,35 @@ export const fill = (
 
       (local.set $buffer_ptr
         (i32.add
-          (local.get $start_mem_ptr)
+          (local.get $channels_ptr)
           (i32.shl (local.get $offset) (i32.const 2))
         )
       )
+
+      ${mod.f_type === Type.multi ? `;;wasm
+      (local.set $buffer_R_ptr
+        (i32.add
+          (local.get $channels_R_ptr)
+          (i32.shl (local.get $offset) (i32.const 2))
+        )
+      )
+      ` : ''}
 
       ;; read input
       ;;(global.set $$x
       ;;  (f32.load offset=20 (local.get $buffer_ptr))
       ;;)
 
-      ;; $sample = f(...params)
-      (local.set $sample
-        ${W(type) < W(Type.f32) ? '(f32.convert_i32_s ' : ''}
-        (call $f ${params.map((x) => `(local.get $${x.id})`).join(' ')})
-        ${W(type) < W(Type.f32) ? ')' : ''}
-      )
+      ${mod.f_type === Type.multi ? '(local.set $sample_R' : ''}
+        (local.set $sample
+          ${W(mod.f_type) < W(Type.f32) ? '(f32.convert_i32_s ' : ''}
+            ${S(mod.funcCall('f', []))}
+          ${W(mod.f_type) < W(Type.f32) ? ')' : ''}
+        )
+      ${mod.f_type === Type.multi ? ')' : ''}
 
       ;; buffer[$offset] =
-      (f32.store offset=${((blockSize + 5) << 2) + 20} (local.get $buffer_ptr)
+      (f32.store offset=${(SIZE_CHANNEL_ONE << 2) + 20} (local.get $buffer_ptr)
         ;; if $sample is finite return $sample else return 0
         (select
           (local.get $sample)
@@ -301,6 +287,24 @@ export const fill = (
         )
       )
 
+      ${mod.f_type === Type.multi ? `;;wasm
+      ;; buffer_R[$offset] =
+      (f32.store offset=${(SIZE_CHANNEL_ONE << 2) + 20} (local.get $buffer_R_ptr)
+        ;; if $sample is finite return $sample else return 0
+        (select
+          (local.get $sample_R)
+          (f32.const 0)
+          (f32.eq
+            (f32.const 0)
+            (f32.sub
+              (local.get $sample_R)
+              (local.get $sample_R)
+            )
+          )
+        )
+      )
+      ` : ''}
+
       ;; $t64 += $sample_time
       (global.set $t64 (f64.add (global.get $t64) (local.get $sample_time)))
       (global.set $t (f32.demote_f64 (global.get $t64)))
@@ -308,14 +312,15 @@ export const fill = (
       ;; $offset++
       (local.set $offset (i32.add (local.get $offset) (i32.const 1)))
 
-      ${Array.from({ length: channels }, (_, i) =>
-    `;;wasm
-        (i32.store offset=0 (global.get $#i${i}) (local.get $offset))
-        (i32.store offset=4 (global.get $#i${i}) (local.get $offset))
-        (i32.store offset=0 (global.get $#o${i}) (local.get $offset))
-        (i32.store offset=4 (global.get $#o${i}) (local.get $offset))
-      `).join('\n')
-  }
+      ${Array.from({ length: inputChannels }, (_, i) => `;;wasm
+      (i32.store offset=0 (global.get $#i${i}) (local.get $offset))
+      (i32.store offset=4 (global.get $#i${i}) (local.get $offset))
+      `).join('\n')}
+
+      ${Array.from({ length: outputChannels }, (_, i) => `;;wasm
+      (i32.store offset=0 (global.get $#o${i}) (local.get $offset))
+      (i32.store offset=4 (global.get $#o${i}) (local.get $offset))
+      `).join('\n')}
 
       ;; $frame++
       (local.set $frame (i32.add (local.get $frame) (i32.const 1)))

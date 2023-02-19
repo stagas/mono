@@ -652,6 +652,7 @@ export const compile = (
 
   if (step === CompStep.User) {
     funcs.__start__.body!.push(
+      ['call', '$update_exports'],
       ...(init_body || []),
       ...mod.fill_body
     )

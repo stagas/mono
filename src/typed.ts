@@ -18,7 +18,7 @@ const I32Suffixed = `
   convert_i32 convert_i64
 `.split(/\s+/)
 
-export const Types: Type[] = [Type.any, Type.bool, Type.i32, Type.f32, Type.none]
+export const Types: Type[] = [Type.any, Type.bool, Type.i32, Type.f32, Type.multi, Type.none]
 
 export const W = (x: Type) => Types.indexOf(x)
 
@@ -57,7 +57,7 @@ export class Typed {
   W = Typed.W
   max = Typed.max
 
-  constructor(public types: TypesMap = new Map()) {}
+  constructor(public types: TypesMap = new Map()) { }
 
   /** looks up and returns the type of `x`, if found, otherwise returns type `any` */
   typeOf = (x: undefined | string | Node | SExpr): Type => ((x && this.types.get(x)) ?? Type.any) as Type
