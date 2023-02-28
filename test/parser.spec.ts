@@ -69,7 +69,7 @@ describe('parse', () => {
     it('parses multiline', () => {
       expect(
         ''
-          + parse(`
+        + parse(`
           3 * 4
         + 5 * 6
         `)
@@ -79,7 +79,7 @@ describe('parse', () => {
     it('ignores single line comments', () => {
       expect(
         ''
-          + parse(`
+        + parse(`
           \\ comment
           3 * 4 \\ a comment
         + 5 * 6
@@ -91,7 +91,7 @@ describe('parse', () => {
     it('ignores block comments', () => {
       expect(
         ''
-          + parse(`
+        + parse(`
           \\ comment
           3\\*careful
           mutliline*\\ * 4 \\ a comment
@@ -144,6 +144,8 @@ describe('parse', () => {
       expect('' + parse('a()=x')).toEqual('(= (@ a) x)')
       expect('' + parse('a(z)=x')).toEqual('(= (@ a z) x)')
       expect('' + parse('a(z[0..2])=x')).toEqual('(= (@ a ([ z (.. 0 2))) x)')
+      expect('' + parse("a('z[0..2])=x")).toEqual("(= (@ a (' ([ z (.. 0 2)))) x)")
+      expect('' + parse("a('z[0..2]**0.3)=x")).toEqual("(= (@ a (** (' ([ z (.. 0 2))) 0.3)) x)")
       expect('' + parse('a(.z[0..2])=x')).toEqual('(= (@ a (. ([ z (.. 0 2)))) x)')
       expect('' + parse('a(z[0..2]=2)=x')).toEqual('(= (@ a (= ([ z (.. 0 2)) 2)) x)')
       expect('' + parse('a(.z[0..2]=2)=x')).toEqual('(= (@ a (= (. ([ z (.. 0 2))) 2)) x)')

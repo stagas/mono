@@ -88,6 +88,12 @@ describe('compile', () => {
     expect(ctx.params).toMatchSnapshot()
   })
 
+  it('function declaration with exported arguments, arg range and slope', () => {
+    const mod = compile(parse('a(\'b[1..2]**.3=1)=1'))
+    const ctx = mod.funcs.a.context
+    expect(ctx.params).toMatchSnapshot()
+  })
+
   it('function declaration with arg range', () => {
     const mod = compile(parse('a(b[1..2])=1'))
     const ctx = mod.funcs.a.context
@@ -403,6 +409,10 @@ describe('compile', () => {
     expect(fc('f', 'f()=({x};{x}=1.5)')).toMatchSnapshot()
     expect(fc('f', 'f()=({x,y};{x,y}=(1.5,2))')).toMatchSnapshot()
     expect(fc('f', 'f()=({x,y};{y,x}=(1.5,2))')).toMatchSnapshot()
+  })
+
+  it('multiple load/store operations', () => {
+    expect(fc('f', 'f()=({x};{y};{x}=1;{y}=2)')).toMatchSnapshot()
   })
 
   describe('buffer', () => {
