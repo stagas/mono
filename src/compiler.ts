@@ -167,6 +167,7 @@ export class Arg {
   default?: SExpr
   originalDefault?: SExpr
   range?: SExpr
+  slope?: SExpr
 
   constructor(
     public id: Token & string,

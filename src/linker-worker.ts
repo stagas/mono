@@ -144,6 +144,7 @@ export interface ExportParam {
     arg: string
     id: string
     range: string
+    slope: string
     default: string
   }
 }
@@ -250,14 +251,18 @@ self.onconnect = ({ ports: [port] }) => {
                   '\'',
                   exportId.source.index
                 )
+                // const parseArg =
+                //   /(?<arg>'?\s*(?<id>[a-zA-Z_$][a-zA-Z0-9_$]*)(?<range>\[[^\]]*?\])?(=.*?(?<default>[^\s,)]+)?)?).*?(,|\)\s*=)/s
+
                 const parseArg =
-                  /(?<arg>'?\s*(?<id>[a-zA-Z_$][a-zA-Z0-9_$]*)(?<range>\[[^\]]*?\])?(=.*?(?<default>[^\s,)]+)?)?).*?(,|\)\s*=)/s
+                  /(?<arg>'?\s*(?<id>[a-zA-Z_$][a-zA-Z0-9_$]*)(?<range>\[[^\]]*?\])?(\*\*(?<slope>[^=]+))?(=.*?(?<default>[^\s,)]+)?)?).*?(,|\)\s*=)/s
 
                 const source = code.slice(sourceIndex).match(parseArg)!
                   .groups as {
                     arg: string
                     id: string
                     range: string
+                    slope: string
                     default: string
                   }
 
@@ -294,6 +299,7 @@ self.onconnect = ({ ports: [port] }) => {
                       id,
                       // TODO: we should be able to fill these details as well
                       range: `[0..1]`,
+                      slope: '',
                       default: '0'
                     },
                   })

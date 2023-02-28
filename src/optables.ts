@@ -868,6 +868,16 @@ export const opTables = (mod: Module) => {
   /** arguments optable */
   const OpParams: OpTable = {
     ...Op,
+    '**': (): CtxOp =>
+      (local, ops) =>
+        (lhs, slopeValue) => {
+          let id = lhs as Token & string
+          if (Array.isArray(id)) id = local.build(id, ops)[0] as Token & string
+          const slope = local.build(slopeValue, Op)
+          const param = mush(local.params, { id, slope }) as Arg
+          local.scope.add(param.type ??= Type.f32, id)
+          return [id]
+        },
     '\'': (): CtxOp =>
       (local, ops) =>
         (lhs) => {
